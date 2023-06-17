@@ -73,6 +73,8 @@ public abstract class DLPDeidentifyText
     extends PTransform<
         PCollection<KV<String, Table.Row>>, PCollection<KV<String, DeidentifyContentResponse>>> {
 
+  public static final Logger LOG = LoggerFactory.getLogger(DLPDeidentifyText.class);
+
   public static final Integer DLP_PAYLOAD_LIMIT_BYTES = 524000;
 
   /**
@@ -220,7 +222,7 @@ public abstract class DLPDeidentifyText
   @Override
   public PCollection<KV<String, DeidentifyContentResponse>> expand(
       PCollection<KV<String, Table.Row>> input) {
-
+    LOG.info("ravi...in DeidentifyText");
     return input
         .apply("Shard Contents", new ShardRows())
         .apply("Batch Contents", ParDo.of(new BatchRequestForDLP(getBatchSizeBytes())))
@@ -345,8 +347,10 @@ public abstract class DLPDeidentifyText
               .addAllHeaders(dlpTableHeaders)
               .addAllRows(c.element().getValue())
               .build();
+
       ContentItem contentItem = ContentItem.newBuilder().setTable(table).build();
       this.requestBuilder.setItem(contentItem);
+      LOG.info("ravi...in contentItem::"+contentItem);
       BackOff backoff = backoffBuilder.backoff();
       boolean retry = true;
       while (retry) {
@@ -356,6 +360,7 @@ public abstract class DLPDeidentifyText
           c.output(KV.of(fileName, response));
           break;
         } catch (ResourceExhaustedException e) {
+          e.printStackTrace();
           retry = BackOffUtils.next(Sleeper.DEFAULT, backoff);
           if (retry) {
             LOG.warn("Error in DLP API, Retrying...");
@@ -366,7 +371,8 @@ public abstract class DLPDeidentifyText
                 this.dlpApiRetryCount,
                 e.getMessage());
           }
-        } catch (ApiException e) {
+        } catch (Exception e) {
+          e.printStackTrace();
           LOG.error(
               "DLP API returned error. Some records were not de-identified {}", e.getMessage());
           retry = false;
