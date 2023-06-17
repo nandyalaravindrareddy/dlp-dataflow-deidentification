@@ -38,17 +38,17 @@ import com.google.swarm.tokenization.txt.ParseTextLogDoFn;
 import com.google.swarm.tokenization.txt.TxtReaderSplitDoFn;
 import java.util.List;
 import java.util.Map;
+
+import org.apache.avro.file.CodecFactory;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.coders.KvCoder;
 import org.apache.beam.sdk.coders.StringUtf8Coder;
+import org.apache.beam.sdk.io.AvroIO;
 import org.apache.beam.sdk.io.FileIO.ReadableFile;
 import org.apache.beam.sdk.io.gcp.pubsub.PubsubIO;
 import org.apache.beam.sdk.options.PipelineOptionsFactory;
-import org.apache.beam.sdk.transforms.Flatten;
-import org.apache.beam.sdk.transforms.ParDo;
-import org.apache.beam.sdk.transforms.Sample;
-import org.apache.beam.sdk.transforms.View;
+import org.apache.beam.sdk.transforms.*;
 import org.apache.beam.sdk.transforms.windowing.FixedWindows;
 import org.apache.beam.sdk.transforms.windowing.Window;
 import org.apache.beam.sdk.values.KV;
@@ -187,7 +187,7 @@ public class DLPTextToBigQueryStreamingV2 {
         throw new IllegalArgumentException("Please validate FileType parameter");
     }
 
-    records
+    PCollectionTuple pCollectionTuple = records
         .apply(
             "DLPTransform",
             DLPTransform.newBuilder()
@@ -201,14 +201,26 @@ public class DLPTextToBigQueryStreamingV2 {
                 .setJobName(options.getJobName())
                 .setDlpApiRetryCount(options.getDlpApiRetryCount())
                 .setInitialBackoff(options.getInitialBackoff())
-                .build())
-        .get(Util.inspectOrDeidSuccess)
-        .apply(
+                .build());
+        pCollectionTuple.get(Util.inspectOrDeidSuccess).apply(
             "StreamInsertToBQ",
             BigQueryDynamicWriteTransform.newBuilder()
                 .setDatasetId(options.getDataset())
                 .setProjectId(options.getProject())
                 .build());
+        PCollection<List<String>> responseTables = pCollectionTuple.get(Util.dlpResponseHeaderList);
+
+        PCollection<List<Table.Row>> dlpRowList = pCollectionTuple.get(Util.dlpResponseRowList);
+
+
+   /* if (options.getOutputDirectory() != null) {
+      encryptedRecords.apply(
+              "WriteAVRO",
+              AvroIO.writeGenericRecords(encryptedSchema)
+                      .withSuffix(".avro")
+                      .to(cleanDirectoryString(options.getOutputDirectory()) + "/data")
+                      .withCodec(CodecFactory.snappyCodec()));
+    }*/
   }
 
   private static void runReidPipeline(

@@ -145,7 +145,7 @@ public abstract class DLPTransform
                   "ConvertDeidResponse",
                   ParDo.of(new ConvertDeidResponse())
                       .withOutputTags(
-                          Util.inspectOrDeidSuccess, TupleTagList.of(Util.inspectOrDeidFailure)));
+                          Util.inspectOrDeidSuccess, TupleTagList.of(Util.inspectOrDeidFailure).and(Util.dlpResponseRowList).and(Util.dlpResponseHeaderList)));
         }
       case REID:
         {
@@ -235,6 +235,8 @@ public abstract class DLPTransform
             throw new IllegalArgumentException(
                 "CSV file's header count must exactly match with data element count");
           }
+          out.get(Util.dlpResponseHeaderList).output(headers);
+          out.get(Util.dlpResponseRowList).output(outputRows);
           out.get(Util.inspectOrDeidSuccess)
               .output(
                   KV.of(
