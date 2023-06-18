@@ -48,7 +48,10 @@ import org.apache.beam.sdk.coders.KvCoder;
 import org.apache.beam.sdk.coders.StringUtf8Coder;
 import org.apache.beam.sdk.extensions.avro.coders.AvroCoder;
 import org.apache.beam.sdk.io.AvroIO;
+import org.apache.beam.sdk.io.FileIO;
 import org.apache.beam.sdk.io.FileIO.ReadableFile;
+import org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO;
+import org.apache.beam.sdk.io.gcp.bigquery.InsertRetryPolicy;
 import org.apache.beam.sdk.io.gcp.pubsub.PubsubIO;
 import org.apache.beam.sdk.options.PipelineOptionsFactory;
 import org.apache.beam.sdk.transforms.*;
@@ -104,13 +107,25 @@ public class DLPTextToBigQueryStreamingV2 {
 
   private static void runInspectAndDeidPipeline(
       Pipeline p, DLPTextToBigQueryStreamingV2PipelineOptions options) {
-    PCollection<KV<String, ReadableFile>> inputFiles =
+    PCollection<KV<String, ReadableFile>> inputFiles = p.apply(FileIO.match().filepattern(options.getFilePattern()))
+            .apply(FileIO.readMatches())
+            .apply(ParDo.of(new DoFn<ReadableFile, KV<String, ReadableFile>>() {
+              @ProcessElement
+              public void processElement(ProcessContext c) {
+                ReadableFile readableFile = c.element();
+                String fileName = readableFile.getMetadata().resourceId().getFilename();
+                c.output(KV.of(fileName,readableFile));
+              }
+            }));
+
+    /*PCollection<KV<String, ReadableFile>> inputFiles =
         p.apply(
                 FilePollingTransform.newBuilder()
                     .setFilePattern(options.getFilePattern())
                     .setInterval(DEFAULT_POLL_INTERVAL)
                     .build())
-            .apply("Fixed Window", Window.into(FixedWindows.of(WINDOW_INTERVAL)));
+            .apply("Fixed Window", Window.into(FixedWindows.of(WINDOW_INTERVAL)));*/
+
     final PCollectionView<Map<String, List<String>>> headers =
         inputFiles.apply(
             "Extract Column Names",
@@ -230,12 +245,25 @@ public class DLPTextToBigQueryStreamingV2 {
                     .withWindowedWrites()
                     .withNumShards(1));
 
-    pCollectionTuple.get(Util.inspectOrDeidSuccess).apply(
+    /*bqDataMap.apply(
+            "Write To BQ",
+            BigQueryIO.<KV<String, TableRow>>write()
+                    .to(new DLPTextToBigQueryStreaming.BQDestination(options.getDatasetName(), options.getDlpProjectId()))
+                    .withFormatFunction(
+                            element -> {
+                              return element.getValue();
+                            })
+                    .withWriteDisposition(BigQueryIO.Write.WriteDisposition.WRITE_APPEND)
+                    .withCreateDisposition(BigQueryIO.Write.CreateDisposition.CREATE_IF_NEEDED)
+                    .withoutValidation()
+                    .withFailedInsertRetryPolicy(InsertRetryPolicy.retryTransientErrors()));*/
+
+    /*pCollectionTuple.get(Util.inspectOrDeidSuccess).apply(
             "StreamInsertToBQ",
             BigQueryDynamicWriteTransform.newBuilder()
                     .setDatasetId(options.getDataset())
                     .setProjectId(options.getProject())
-                    .build());
+                    .build());*/
 
    /* if (options.getOutputDirectory() != null) {
       encryptedRecords.apply(

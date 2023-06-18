@@ -1,0 +1,11 @@
+--region=us-central1
+--project=avid-booth-387215
+--tempLocation=gs://avid-booth-387215-bucket/temp
+--numWorkers=1
+--maxNumWorkers=2
+--runner=DataflowRunner
+--filePattern=gs://avid-booth-387215-bucket/ravi/inputfiles/*.avro
+--dataset=ravi_dataset
+--deidentifyTemplateName=projects/avid-booth-387215/locations/global/deidentifyTemplates/employee_record_condition_global
+--DLPMethod=DEID
+--outputAvroBucket=gs://avid-booth-387215-bucket/ravi/outputfiles/
