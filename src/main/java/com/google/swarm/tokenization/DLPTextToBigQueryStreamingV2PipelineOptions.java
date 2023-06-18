@@ -33,6 +33,11 @@ public interface DLPTextToBigQueryStreamingV2PipelineOptions
 
   void setFilePattern(String csvFilePattern);
 
+  @Validation.Required
+  String getOutputAvroBucket();
+
+  void setOutputAvroBucket(String outputAvroBucket);
+
   @Description("DLP Inspect Template Name")
   String getInspectTemplateName();
 

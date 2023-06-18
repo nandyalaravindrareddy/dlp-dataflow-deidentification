@@ -41,6 +41,8 @@ import java.util.Scanner;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import org.apache.avro.generic.GenericRecord;
 import org.apache.beam.sdk.extensions.gcp.util.gcsfs.GcsPath;
 import org.apache.beam.sdk.io.FileIO.ReadableFile;
 import org.apache.beam.sdk.schemas.Schema;
@@ -102,11 +104,9 @@ public class Util {
   public static final TupleTag<KV<String, TableRow>> inspectOrDeidFailure =
       new TupleTag<KV<String, TableRow>>() {};
 
-  public static final TupleTag<java.util.List<String>> dlpResponseHeaderList =
-          new TupleTag<java.util.List<String>>() {};
 
-  public static final TupleTag<java.util.List<Table.Row>> dlpResponseRowList =
-          new TupleTag<java.util.List<Table.Row>>() {};
+  public static final TupleTag<GenericRecord> deidGenericRecords =
+          new TupleTag<GenericRecord>() {};
 
   public static final TupleTag<KV<String, TableRow>> reidSuccess =
       new TupleTag<KV<String, TableRow>>() {};

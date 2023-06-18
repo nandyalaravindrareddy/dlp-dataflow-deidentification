@@ -39,11 +39,14 @@ import com.google.swarm.tokenization.txt.TxtReaderSplitDoFn;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.avro.Schema;
 import org.apache.avro.file.CodecFactory;
+import org.apache.avro.generic.GenericRecord;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.coders.KvCoder;
 import org.apache.beam.sdk.coders.StringUtf8Coder;
+import org.apache.beam.sdk.extensions.avro.coders.AvroCoder;
 import org.apache.beam.sdk.io.AvroIO;
 import org.apache.beam.sdk.io.FileIO.ReadableFile;
 import org.apache.beam.sdk.io.gcp.pubsub.PubsubIO;
@@ -187,10 +190,22 @@ public class DLPTextToBigQueryStreamingV2 {
         throw new IllegalArgumentException("Please validate FileType parameter");
     }
 
+    String schemaString = "{\n" +
+            "  \"namespace\": \"RaviAvroIoDemo\",\n" +
+            "  \"name\": \"user\",\n" +
+            "  \"type\": \"record\",\n" +
+            "  \"fields\": [\n" +
+            "    {\"name\": \"id\", \"type\": \"string\"},\n" +
+            "    {\"name\": \"name\", \"type\": \"string\"},\n" +
+            "    {\"name\": \"email\", \"type\": \"string\"}\n" +
+            "  ]\n" +
+            "}";
+    Schema schema = new Schema.Parser().parse(schemaString);
     PCollectionTuple pCollectionTuple = records
         .apply(
             "DLPTransform",
             DLPTransform.newBuilder()
+                    .setSchemaStr(schemaString)
                 .setBatchSize(options.getBatchSize())
                 .setInspectTemplateName(options.getInspectTemplateName())
                 .setDeidTemplateName(options.getDeidentifyTemplateName())
@@ -202,16 +217,25 @@ public class DLPTextToBigQueryStreamingV2 {
                 .setDlpApiRetryCount(options.getDlpApiRetryCount())
                 .setInitialBackoff(options.getInitialBackoff())
                 .build());
-        pCollectionTuple.get(Util.inspectOrDeidSuccess).apply(
+
+
+    PCollection<GenericRecord> deidGenericRecords = pCollectionTuple.get(Util.deidGenericRecords).setCoder(AvroCoder.of(GenericRecord.class, schema));
+
+    deidGenericRecords.apply(
+            "WriteAVRO",
+            AvroIO.writeGenericRecords(schema)
+                    .to(options.getOutputAvroBucket())
+                    .withCodec(CodecFactory.snappyCodec())
+                    .withSuffix("_ravi_op.avro")
+                    .withWindowedWrites()
+                    .withNumShards(1));
+
+    pCollectionTuple.get(Util.inspectOrDeidSuccess).apply(
             "StreamInsertToBQ",
             BigQueryDynamicWriteTransform.newBuilder()
-                .setDatasetId(options.getDataset())
-                .setProjectId(options.getProject())
-                .build());
-        PCollection<List<String>> responseTables = pCollectionTuple.get(Util.dlpResponseHeaderList);
-
-        PCollection<List<Table.Row>> dlpRowList = pCollectionTuple.get(Util.dlpResponseRowList);
-
+                    .setDatasetId(options.getDataset())
+                    .setProjectId(options.getProject())
+                    .build());
 
    /* if (options.getOutputDirectory() != null) {
       encryptedRecords.apply(

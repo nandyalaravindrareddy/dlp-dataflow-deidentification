@@ -15,20 +15,29 @@
  */
 package com.google.swarm.tokenization.common;
 
+import com.github.wnameless.json.unflattener.JsonUnflattener;
+import com.google.api.client.util.Maps;
 import com.google.api.services.bigquery.model.TableRow;
 import com.google.auto.value.AutoValue;
-import com.google.privacy.dlp.v2.DeidentifyContentResponse;
-import com.google.privacy.dlp.v2.InspectContentResponse;
-import com.google.privacy.dlp.v2.ReidentifyContentResponse;
-import com.google.privacy.dlp.v2.Table;
+import com.google.privacy.dlp.v2.*;
 import com.google.swarm.tokenization.beam.DLPDeidentifyText;
 import com.google.swarm.tokenization.beam.DLPInspectText;
 import com.google.swarm.tokenization.beam.DLPReidentifyText;
 import com.google.swarm.tokenization.common.Util.DLPMethod;
+
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import javax.annotation.Nullable;
+
+import com.google.swarm.tokenization.ravisamples.TestDlp;
+import org.apache.avro.Schema;
+import org.apache.avro.generic.GenericRecord;
 import org.apache.beam.sdk.io.gcp.bigquery.BigQueryHelpers;
 import org.apache.beam.sdk.metrics.Counter;
 import org.apache.beam.sdk.metrics.Metrics;
@@ -44,11 +53,16 @@ import org.apache.beam.sdk.values.TupleTagList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.google.swarm.tokenization.common.JsonConvertor.convertJsonToAvro;
+
 @AutoValue
 public abstract class DLPTransform
     extends PTransform<PCollection<KV<String, Table.Row>>, PCollectionTuple> {
 
   public static final Logger LOG = LoggerFactory.getLogger(DLPTransform.class);
+
+  @Nullable
+  public abstract String schemaStr();
 
   @Nullable
   public abstract String inspectTemplateName();
@@ -74,6 +88,8 @@ public abstract class DLPTransform
 
   @AutoValue.Builder
   public abstract static class Builder {
+
+    public abstract Builder setSchemaStr(String schemaStr);
 
     public abstract Builder setInspectTemplateName(String inspectTemplateName);
 
@@ -143,9 +159,9 @@ public abstract class DLPTransform
                       .build())
               .apply(
                   "ConvertDeidResponse",
-                  ParDo.of(new ConvertDeidResponse())
+                  ParDo.of(new ConvertDeidResponse(schemaStr()))
                       .withOutputTags(
-                          Util.inspectOrDeidSuccess, TupleTagList.of(Util.inspectOrDeidFailure).and(Util.dlpResponseRowList).and(Util.dlpResponseHeaderList)));
+                          Util.inspectOrDeidSuccess, TupleTagList.of(Util.inspectOrDeidFailure).and(Util.deidGenericRecords)));
         }
       case REID:
         {
@@ -213,6 +229,11 @@ public abstract class DLPTransform
   static class ConvertDeidResponse
       extends DoFn<KV<String, DeidentifyContentResponse>, KV<String, TableRow>> {
 
+    private String schemaStr;
+
+    public ConvertDeidResponse(String schemaStr) {
+      this.schemaStr = schemaStr;
+    }
     private final Counter numberOfRowDeidentified =
         Metrics.counter(ConvertDeidResponse.class, "numberOfRowDeidentified");
 
@@ -235,8 +256,8 @@ public abstract class DLPTransform
             throw new IllegalArgumentException(
                 "CSV file's header count must exactly match with data element count");
           }
-          out.get(Util.dlpResponseHeaderList).output(headers);
-          out.get(Util.dlpResponseRowList).output(outputRows);
+          GenericRecord genericRecord = generateGenericRecord(outputRow,headers,schemaStr);
+          out.get(Util.deidGenericRecords).output(genericRecord);
           out.get(Util.inspectOrDeidSuccess)
               .output(
                   KV.of(
@@ -327,4 +348,80 @@ public abstract class DLPTransform
               });
     }
   }
+
+  static GenericRecord generateGenericRecord(Table.Row tableRow,List<String> headers,String schemaStr){
+    Map<String, Value> flatRecords = new LinkedHashMap<>();
+    Map<String, Object> jsonValueMap = Maps.newHashMap();
+
+    IntStream.range(0,headers.size())
+            .forEach(index -> flatRecords.put(headers.get(index), tableRow.getValues(index)));
+
+    for (Map.Entry<String, Value> entry : flatRecords.entrySet()) {
+      ValueProcessor valueProcessor = new ValueProcessor(entry);
+      jsonValueMap.put(valueProcessor.cleanKey(), valueProcessor.convertedValue());
+    }
+    Schema schema = new Schema.Parser().parse(schemaStr);
+    String unattendedRecordJson = new JsonUnflattener(jsonValueMap).unflatten();
+    return convertJsonToAvro(schema, unattendedRecordJson);
+  }
+
+
+  public static class ValueProcessor {
+
+    /** REGEX pattern to extract a string value's actual type that is suffixed with the key name. */
+    private static final Pattern VALUE_PATTERN = Pattern.compile("/(?<type>\\w+)$");
+
+    private final String rawKey;
+    private final Value value;
+
+    ValueProcessor(Map.Entry<String, Value> entry) {
+      this.rawKey = entry.getKey();
+      this.value = entry.getValue();
+    }
+
+    /**
+     * Converts a {@link Value} object to Schema appropriate Java object.
+     *
+     * @return Java Object equivalent for the Value Object.
+     */
+    Object convertedValue() {
+      String keyType = keyType();
+
+      switch (value.getTypeCase()) {
+        case INTEGER_VALUE:
+          return new BigInteger(String.valueOf(value.getIntegerValue()));
+        case FLOAT_VALUE:
+          return new BigDecimal(String.valueOf(value.getFloatValue()));
+
+        case BOOLEAN_VALUE:
+          return value.getBooleanValue();
+
+        case TYPE_NOT_SET:
+          return null;
+        default:
+        case STRING_VALUE:
+          if (keyType != null && keyType.equals("bytes")) {
+            return ByteValueConverter.of(value).asJsonString();
+          }
+          return value.getStringValue();
+      }
+    }
+
+    /** Returns the original type of a string value. */
+    private String keyType() {
+      java.util.regex.Matcher matcher = VALUE_PATTERN.matcher(rawKey);
+      if (matcher.find()) {
+        return matcher.group("type");
+      }
+
+      return null;
+    }
+
+    /** Remove the type-suffix from string value's key. */
+    String cleanKey() {
+      return VALUE_PATTERN.matcher(rawKey).replaceFirst("").replaceFirst("^\\$\\.", "");
+    }
+  }
+
+
 }
