@@ -29,6 +29,16 @@ public interface DLPTextToBigQueryStreamingV2PipelineOptions
     extends DataflowPipelineOptions, S3Options {
 
   @Validation.Required
+  String getDeidConfig();
+
+  void setDeidConfig(String deidConfig);
+
+  @Validation.Required
+  String getDeidSchema();
+
+  void setDeidSchema(String deidSchema);
+
+  @Validation.Required
   String getFilePattern();
 
   void setFilePattern(String csvFilePattern);

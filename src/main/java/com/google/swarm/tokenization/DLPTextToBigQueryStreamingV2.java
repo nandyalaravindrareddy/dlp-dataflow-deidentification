@@ -16,21 +16,13 @@
 package com.google.swarm.tokenization;
 
 import com.google.api.services.bigquery.model.TableRow;
+import com.google.privacy.dlp.v2.DeidentifyConfig;
 import com.google.privacy.dlp.v2.Table;
 import com.google.swarm.tokenization.avro.AvroReaderSplittableDoFn;
 import com.google.swarm.tokenization.avro.ConvertAvroRecordToDlpRowDoFn;
 import com.google.swarm.tokenization.avro.GenericRecordCoder;
 import com.google.swarm.tokenization.beam.ConvertCSVRecordToDLPRow;
-import com.google.swarm.tokenization.common.BigQueryDynamicWriteTransform;
-import com.google.swarm.tokenization.common.BigQueryReadTransform;
-import com.google.swarm.tokenization.common.BigQueryTableHeaderDoFn;
-import com.google.swarm.tokenization.common.CSVFileReaderSplitDoFn;
-import com.google.swarm.tokenization.common.DLPTransform;
-import com.google.swarm.tokenization.common.ExtractColumnNamesTransform;
-import com.google.swarm.tokenization.common.FilePollingTransform;
-import com.google.swarm.tokenization.common.MergeBigQueryRowToDlpRow;
-import com.google.swarm.tokenization.common.PubSubMessageConverts;
-import com.google.swarm.tokenization.common.Util;
+import com.google.swarm.tokenization.common.*;
 import com.google.swarm.tokenization.json.ConvertJsonRecordToDLPRow;
 import com.google.swarm.tokenization.json.JsonReaderSplitDoFn;
 import com.google.swarm.tokenization.txt.ConvertTxtToDLPRow;
@@ -107,6 +99,8 @@ public class DLPTextToBigQueryStreamingV2 {
 
   private static void runInspectAndDeidPipeline(
       Pipeline p, DLPTextToBigQueryStreamingV2PipelineOptions options) {
+    DeidentifyConfig deidentifyConfig = JsonConvertor.parseJson(ReadGcsObject.getGcsObjectContent(options.getDeidConfig()), DeidentifyConfig.class);
+    Schema schema = new Schema.Parser().parse(ReadGcsObject.getGcsObjectContent(options.getDeidSchema()));
     PCollection<KV<String, ReadableFile>> inputFiles = p.apply(FileIO.match().filepattern(options.getFilePattern()))
             .apply(FileIO.readMatches())
             .apply(ParDo.of(new DoFn<ReadableFile, KV<String, ReadableFile>>() {
@@ -215,12 +209,13 @@ public class DLPTextToBigQueryStreamingV2 {
             "    {\"name\": \"email\", \"type\": \"string\"}\n" +
             "  ]\n" +
             "}";
-    Schema schema = new Schema.Parser().parse(schemaString);
+    //Schema schema = new Schema.Parser().parse(schemaString);
     PCollectionTuple pCollectionTuple = records
         .apply(
             "DLPTransform",
             DLPTransform.newBuilder()
-                    .setSchemaStr(schemaString)
+                    .setSchema(schemaString)
+                    .setDeidConfig(deidentifyConfig)
                 .setBatchSize(options.getBatchSize())
                 .setInspectTemplateName(options.getInspectTemplateName())
                 .setDeidTemplateName(options.getDeidentifyTemplateName())

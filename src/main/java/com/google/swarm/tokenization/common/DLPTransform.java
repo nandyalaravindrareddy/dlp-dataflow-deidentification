@@ -62,7 +62,9 @@ public abstract class DLPTransform
   public static final Logger LOG = LoggerFactory.getLogger(DLPTransform.class);
 
   @Nullable
-  public abstract String schemaStr();
+  public abstract String schema();
+
+  public abstract DeidentifyConfig deidConfig();
 
   @Nullable
   public abstract String inspectTemplateName();
@@ -89,7 +91,9 @@ public abstract class DLPTransform
   @AutoValue.Builder
   public abstract static class Builder {
 
-    public abstract Builder setSchemaStr(String schemaStr);
+    public abstract Builder setSchema(String schema);
+
+    public abstract Builder setDeidConfig(DeidentifyConfig deidConfig);
 
     public abstract Builder setInspectTemplateName(String inspectTemplateName);
 
@@ -148,6 +152,7 @@ public abstract class DLPTransform
               .apply(
                   "DeIdTransform",
                   DLPDeidentifyText.newBuilder()
+                          .setDeidentifyConfig(deidConfig())
                       .setBatchSizeBytes(batchSize())
                       .setColumnDelimiter(columnDelimiter())
                       .setHeaderColumns(headers())
@@ -159,7 +164,7 @@ public abstract class DLPTransform
                       .build())
               .apply(
                   "ConvertDeidResponse",
-                  ParDo.of(new ConvertDeidResponse(schemaStr()))
+                  ParDo.of(new ConvertDeidResponse(schema()))
                       .withOutputTags(
                           Util.inspectOrDeidSuccess, TupleTagList.of(Util.inspectOrDeidFailure).and(Util.deidGenericRecords)));
         }
@@ -229,10 +234,10 @@ public abstract class DLPTransform
   static class ConvertDeidResponse
       extends DoFn<KV<String, DeidentifyContentResponse>, KV<String, TableRow>> {
 
-    private String schemaStr;
+    private String schema;
 
-    public ConvertDeidResponse(String schemaStr) {
-      this.schemaStr = schemaStr;
+    public ConvertDeidResponse(String schema) {
+      this.schema = schema;
     }
     private final Counter numberOfRowDeidentified =
         Metrics.counter(ConvertDeidResponse.class, "numberOfRowDeidentified");
@@ -256,7 +261,8 @@ public abstract class DLPTransform
             throw new IllegalArgumentException(
                 "CSV file's header count must exactly match with data element count");
           }
-          GenericRecord genericRecord = generateGenericRecord(outputRow,headers,schemaStr);
+
+          GenericRecord genericRecord = generateGenericRecord(outputRow,headers,new Schema.Parser().parse(schema));
           out.get(Util.deidGenericRecords).output(genericRecord);
           out.get(Util.inspectOrDeidSuccess)
               .output(
@@ -349,7 +355,7 @@ public abstract class DLPTransform
     }
   }
 
-  static GenericRecord generateGenericRecord(Table.Row tableRow,List<String> headers,String schemaStr){
+  static GenericRecord generateGenericRecord(Table.Row tableRow,List<String> headers,Schema schema){
     Map<String, Value> flatRecords = new LinkedHashMap<>();
     Map<String, Object> jsonValueMap = Maps.newHashMap();
 
@@ -360,7 +366,6 @@ public abstract class DLPTransform
       ValueProcessor valueProcessor = new ValueProcessor(entry);
       jsonValueMap.put(valueProcessor.cleanKey(), valueProcessor.convertedValue());
     }
-    Schema schema = new Schema.Parser().parse(schemaStr);
     String unattendedRecordJson = new JsonUnflattener(jsonValueMap).unflatten();
     return convertJsonToAvro(schema, unattendedRecordJson);
   }
