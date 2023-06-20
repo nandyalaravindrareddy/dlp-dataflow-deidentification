@@ -1,0 +1,11 @@
+{
+  "namespace": "RaviRnd",
+  "name": "user",
+  "type": "record",
+  "fields": [
+    {"name": "id", "type": "string"},
+    {"name": "name", "type": "string"},
+    {"name": "email", "type": ["null", "string"], "default":null}
+  ]
+}
+
