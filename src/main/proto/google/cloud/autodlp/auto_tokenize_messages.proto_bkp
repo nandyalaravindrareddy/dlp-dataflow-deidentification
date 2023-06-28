@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package com.google.cloud.solutions.autotokenize;
+
+import "google/privacy/dlp/v2/dlp.proto";
+
+message DeidentifyConfigTemplate {
+  string  displayName =1
+  string description = 2;
+  .google.privacy.dlp.v2.DeidentifyConfig deidconfig = 3;
+}

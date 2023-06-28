@@ -40,7 +40,7 @@ public class AvroColumnNamesDoFn extends DoFn<KV<String, ReadableFile>, KV<Strin
       DatumReader<GenericRecord> reader = new GenericDatumReader<>();
       DataFileReader<GenericRecord> fileReader = new DataFileReader<>(channel, reader);
       List<String> fieldNames = new ArrayList<>();
-      AvroUtil.flattenFieldNames(fileReader.getSchema(), fieldNames, "");
+      AvroUtil.flattenFieldNamesForAvroFile(fileReader.getSchema(), fieldNames, "");
 
       String fileName = c.element().getKey();
       c.output(KV.of(fileName, fieldNames));

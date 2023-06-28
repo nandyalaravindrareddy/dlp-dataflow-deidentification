@@ -44,8 +44,20 @@ public class AvroUtil {
   public static void flattenFieldNames(Schema schema, List<String> fieldNames, String prefix) {
     for (Schema.Field field : schema.getFields()) {
       if (field.schema().getType() == Schema.Type.RECORD) {
-        flattenFieldNames(field.schema(), fieldNames, prefix + field.name() + ".");
+        flattenFieldNamesForAvroFile(field.schema(), fieldNames, prefix + field.name() + ".");
       } else {
+        fieldNames.add(prefix + field.name());
+      }
+    }
+  }
+
+  public static void flattenFieldNamesForAvroFile(Schema schema, List<String> fieldNames, String prefix) {
+    for (Schema.Field field : schema.getFields()) {
+      if (field.schema().getType() == Schema.Type.RECORD) {
+        flattenFieldNamesForAvroFile(field.schema(), fieldNames, prefix + field.name() + ".");
+      } else if(field.schema().getType() == Schema.Type.UNION) {
+        fieldNames.add(field.name()+"."+field.schema().getTypes().get(1).getType().getName());
+      }else{
         fieldNames.add(prefix + field.name());
       }
     }

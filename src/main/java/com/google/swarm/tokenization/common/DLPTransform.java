@@ -66,6 +66,8 @@ public abstract class DLPTransform
 
   public abstract DeidentifyConfig deidConfig();
 
+  public abstract DeidentifyConfig reidConfig();
+
   @Nullable
   public abstract String inspectTemplateName();
 
@@ -94,6 +96,8 @@ public abstract class DLPTransform
     public abstract Builder setSchema(String schema);
 
     public abstract Builder setDeidConfig(DeidentifyConfig deidConfig);
+
+    public abstract Builder setReidConfig(DeidentifyConfig reidConfig);
 
     public abstract Builder setInspectTemplateName(String inspectTemplateName);
 
@@ -164,7 +168,7 @@ public abstract class DLPTransform
                       .build())
               .apply(
                   "ConvertDeidResponse",
-                  ParDo.of(new ConvertDeidResponse(schema()))
+                  ParDo.of(new ConvertDeidResponse(schema(),headers())).withSideInputs(headers())
                       .withOutputTags(
                           Util.inspectOrDeidSuccess, TupleTagList.of(Util.inspectOrDeidFailure).and(Util.deidGenericRecords)));
         }
@@ -174,6 +178,7 @@ public abstract class DLPTransform
               .apply(
                   "ReIdTransform",
                   DLPReidentifyText.newBuilder()
+                          .setReidentifyConfig(reidConfig())
                       .setBatchSizeBytes(batchSize())
                       .setColumnDelimiter(columnDelimiter())
                       .setHeaderColumns(headers())
@@ -236,24 +241,29 @@ public abstract class DLPTransform
 
     private String schema;
 
-    public ConvertDeidResponse(String schema) {
+    private PCollectionView<Map<String, List<String>>> headerCoumnsView;
+
+    public ConvertDeidResponse(String schema,PCollectionView<Map<String, List<String>>> headerCoumnsView) {
       this.schema = schema;
+      this.headerCoumnsView = headerCoumnsView;
     }
     private final Counter numberOfRowDeidentified =
         Metrics.counter(ConvertDeidResponse.class, "numberOfRowDeidentified");
 
     @ProcessElement
-    public void processElement(
-        @Element KV<String, DeidentifyContentResponse> element, MultiOutputReceiver out) {
+    public void processElement(ProcessContext processContext,MultiOutputReceiver out) {
 
+      KV<String, DeidentifyContentResponse> element=processContext.element();
+      Map<String, List<String>> headerColumnMap = processContext.sideInput(headerCoumnsView);
       String fileName = element.getKey();
       Table tokenizedData = element.getValue().getItem().getTable();
       LOG.info("Table de-identified returned with {} rows", tokenizedData.getRowsCount());
       numberOfRowDeidentified.inc(tokenizedData.getRowsCount());
-      List<String> headers =
+      List<String> headers = headerColumnMap.get(fileName);
+      /*List<String> headers =
           tokenizedData.getHeadersList().stream()
               .map(fid -> fid.getName())
-              .collect(Collectors.toList());
+              .collect(Collectors.toList());*/
       List<Table.Row> outputRows = tokenizedData.getRowsList();
       if (outputRows.size() > 0) {
         for (Table.Row outputRow : outputRows) {
@@ -261,8 +271,8 @@ public abstract class DLPTransform
             throw new IllegalArgumentException(
                 "CSV file's header count must exactly match with data element count");
           }
-
-          GenericRecord genericRecord = generateGenericRecord(outputRow,headers,new Schema.Parser().parse(schema));
+          Schema schemaObject =  new Schema.Parser().parse(ReadGcsObject.getGcsObjectContent(schema));
+          GenericRecord genericRecord = generateGenericRecord(outputRow,headers,schemaObject);
           out.get(Util.deidGenericRecords).output(genericRecord);
           out.get(Util.inspectOrDeidSuccess)
               .output(

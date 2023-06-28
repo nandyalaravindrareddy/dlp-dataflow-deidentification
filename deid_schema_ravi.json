@@ -1,5 +1,5 @@
 {
-  "namespace": "RaviRnd",
+  "namespace": "io.sqooba",
   "name": "user",
   "type": "record",
   "fields": [
@@ -8,4 +8,3 @@
     {"name": "email", "type": ["null", "string"], "default":null}
   ]
 }
-

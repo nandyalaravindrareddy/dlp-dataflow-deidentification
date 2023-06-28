@@ -112,7 +112,7 @@ public class DLPTextToBigQueryStreamingV2 {
               }
             }));
 
-    /*PCollection<KV<String, ReadableFile>> inputFiles =
+   /* PCollection<KV<String, ReadableFile>> inputFiles =
         p.apply(
                 FilePollingTransform.newBuilder()
                     .setFilePattern(options.getFilePattern())
@@ -128,6 +128,7 @@ public class DLPTextToBigQueryStreamingV2 {
                 .setHeaders(options.getHeaders())
                 .setColumnDelimiter(options.getColumnDelimiter())
                 .build());
+
 
     PCollection<KV<String, Table.Row>> records;
 
@@ -199,7 +200,7 @@ public class DLPTextToBigQueryStreamingV2 {
         throw new IllegalArgumentException("Please validate FileType parameter");
     }
 
-    String schemaString = "{\n" +
+    /*String schemaString = "{\n" +
             "  \"namespace\": \"RaviAvroIoDemo\",\n" +
             "  \"name\": \"user\",\n" +
             "  \"type\": \"record\",\n" +
@@ -208,14 +209,15 @@ public class DLPTextToBigQueryStreamingV2 {
             "    {\"name\": \"name\", \"type\": \"string\"},\n" +
             "    {\"name\": \"email\", \"type\": \"string\"}\n" +
             "  ]\n" +
-            "}";
+            "}";*/
     //Schema schema = new Schema.Parser().parse(schemaString);
     PCollectionTuple pCollectionTuple = records
         .apply(
             "DLPTransform",
             DLPTransform.newBuilder()
-                    .setSchema(schemaString)
+                    .setSchema(options.getDeidSchema())
                     .setDeidConfig(deidentifyConfig)
+                    .setReidConfig(deidentifyConfig)
                 .setBatchSize(options.getBatchSize())
                 .setInspectTemplateName(options.getInspectTemplateName())
                 .setDeidTemplateName(options.getDeidentifyTemplateName())
@@ -230,7 +232,7 @@ public class DLPTextToBigQueryStreamingV2 {
 
 
     PCollection<GenericRecord> deidGenericRecords = pCollectionTuple.get(Util.deidGenericRecords).setCoder(AvroCoder.of(GenericRecord.class, schema));
-
+    //TupleTag<KV<String, TableRow>> inspectOrDeidSuccessMap = pCollectionTuple.get(Util.inspectOrDeidSuccess);
     deidGenericRecords.apply(
             "WriteAVRO",
             AvroIO.writeGenericRecords(schema)
@@ -240,18 +242,6 @@ public class DLPTextToBigQueryStreamingV2 {
                     .withWindowedWrites()
                     .withNumShards(1));
 
-    /*bqDataMap.apply(
-            "Write To BQ",
-            BigQueryIO.<KV<String, TableRow>>write()
-                    .to(new DLPTextToBigQueryStreaming.BQDestination(options.getDatasetName(), options.getDlpProjectId()))
-                    .withFormatFunction(
-                            element -> {
-                              return element.getValue();
-                            })
-                    .withWriteDisposition(BigQueryIO.Write.WriteDisposition.WRITE_APPEND)
-                    .withCreateDisposition(BigQueryIO.Write.CreateDisposition.CREATE_IF_NEEDED)
-                    .withoutValidation()
-                    .withFailedInsertRetryPolicy(InsertRetryPolicy.retryTransientErrors()));*/
 
     /*pCollectionTuple.get(Util.inspectOrDeidSuccess).apply(
             "StreamInsertToBQ",
@@ -259,15 +249,6 @@ public class DLPTextToBigQueryStreamingV2 {
                     .setDatasetId(options.getDataset())
                     .setProjectId(options.getProject())
                     .build());*/
-
-   /* if (options.getOutputDirectory() != null) {
-      encryptedRecords.apply(
-              "WriteAVRO",
-              AvroIO.writeGenericRecords(encryptedSchema)
-                      .withSuffix(".avro")
-                      .to(cleanDirectoryString(options.getOutputDirectory()) + "/data")
-                      .withCodec(CodecFactory.snappyCodec()));
-    }*/
   }
 
   private static void runReidPipeline(
@@ -276,6 +257,10 @@ public class DLPTextToBigQueryStreamingV2 {
     // there is always a single possible reference for this batch pipeline.
     // Changing it will require additional refactoring which is outside of the scope of the current
     // fix.
+
+    DeidentifyConfig reidConfig = JsonConvertor.parseJson(ReadGcsObject.getGcsObjectContent(options.getDeidConfig()), DeidentifyConfig.class);
+    Schema schema = new Schema.Parser().parse(ReadGcsObject.getGcsObjectContent(options.getDeidSchema()));
+
     PCollection<KV<String, TableRow>> records =
         p.apply(
             "ReadFromBQ",
@@ -283,7 +268,8 @@ public class DLPTextToBigQueryStreamingV2 {
                 .setTableRef(options.getTableRef())
                 .setReadMethod(options.getReadMethod())
                 .setKeyRange(options.getKeyRange())
-                .setQuery(Util.getQueryFromGcs(options.getQueryPath()))
+                //.setQuery(Util.getQueryFromGcs(options.getQueryPath()))
+                    .setQuery("SELECT id,name,email FROM `avid-booth-387215.ravidataset.ravi_inputfiles_employee` LIMIT 10")
                 .build());
 
     PCollectionView<Map<String, List<String>>> selectedColumns =
@@ -298,6 +284,8 @@ public class DLPTextToBigQueryStreamingV2 {
             .apply(
                 "DLPTransform",
                 DLPTransform.newBuilder()
+                        .setReidConfig(reidConfig)
+                        .setDeidConfig(reidConfig)
                     .setBatchSize(options.getBatchSize())
                     .setInspectTemplateName(options.getInspectTemplateName())
                     .setDeidTemplateName(options.getDeidentifyTemplateName())

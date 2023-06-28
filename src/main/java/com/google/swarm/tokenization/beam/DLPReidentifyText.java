@@ -347,27 +347,38 @@ public abstract class DLPReidentifyText
               .addAllRows(context.element().getValue())
               .build();
       ContentItem contentItem = ContentItem.newBuilder().setTable(table).build();
+      System.out.println("ravi...."+contentItem);
+
       this.requestBuilder.setItem(contentItem);
+      ReidentifyContentRequest reidentifyContentRequest = requestBuilder.build();
+      System.out.println("ravi...."+reidentifyContentRequest);
       BackOff backoff = backoffBuilder.backoff();
       boolean retry = true;
       while (retry) {
         try {
+
           ReidentifyContentResponse response =
-              dlpServiceClient.reidentifyContent(requestBuilder.build());
+              dlpServiceClient.reidentifyContent(reidentifyContentRequest);
 
           context.output(KV.of(tableRef, response));
         } catch (ResourceExhaustedException e) {
+          Thread.sleep(10000);
+          e.printStackTrace();
           retry = BackOffUtils.next(Sleeper.DEFAULT, backoff);
+          retry = false;
           if (retry) {
             LOG.warn("Error in DLP API, Retrying...");
           } else {
+            Thread.sleep(10000);
             numberOfDLPRowBagsFailedReid.inc();
             LOG.error(
                 "Retried {} times unsuccessfully. Not able to reidentify some records. Exception: {}",
                 this.dlpApiRetryCount,
                 e.getMessage());
+            retry = false;
           }
         } catch (ApiException e) {
+          Thread.sleep(10000);
           LOG.error(
               "DLP API returned error. Not able to insreidentifypect some records {}",
               e.getMessage());

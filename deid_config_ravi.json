@@ -1,41 +1,24 @@
 {
-      "recordTransformations": {
-        "fieldTransformations": [
-          {
-            "primitiveTransformation": {
-              "cryptoHashConfig": {
-                "cryptoKey": {
-                  "kmsWrapped": {
-                    "cryptoKeyName": "projects/avid-booth-387215/locations/global/keyRings/dlp-keyring/cryptoKeys/dlp-key",
-                    "wrappedKey": "CiQAMq/lBB7TzWUl1J9rUMZ2LpCLSaw0qFuhw9H04cxREbcpmhsSSABO+ZpHFoFU9HUtXttQg8IcLaCPtrDpOC0w0LlyFYfNY8Du2bxUj9qSGR3HkmcXJJ/bN4/JThBAliYQc9564DZnhjZeeRn31A=="
-                  }
-                }
-              }
-            },
-            "fields": [
-              {
-                "name": "name"
-              }
-            ],
-            "condition": {
-              "expressions": {
-                "conditions": {
-                  "conditions": [
-                    {
-                      "field": {
-                        "name": "id"
-                      },
-                      "operator": "EQUAL_TO",
-                      "value": {
-                        "integerValue": 5
-                      }
-                    }
-                  ]
-                }
+  "recordTransformations": {
+    "fieldTransformations": [
+      {
+        "primitiveTransformation": {
+          "cryptoDeterministicConfig": {
+            "cryptoKey": {
+              "kmsWrapped": {
+                "cryptoKeyName": "projects/avid-booth-387215/locations/global/keyRings/dlp-keyring/cryptoKeys/dlp-key",
+                "wrappedKey": "CiQAMq/lBB7TzWUl1J9rUMZ2LpCLSaw0qFuhw9H04cxREbcpmhsSSABO+ZpHFoFU9HUtXttQg8IcLaCPtrDpOC0w0LlyFYfNY8Du2bxUj9qSGR3HkmcXJJ/bN4/JThBAliYQc9564DZnhjZeeRn31A=="
               }
             }
           }
+        },
+        "fields": [
+          {
+            "name": "id"
+          }
         ]
       }
-    }
+    ]
   }
+}
+

@@ -77,9 +77,14 @@ public interface DLPTextToBigQueryStreamingV2PipelineOptions
   void setKeyRange(Integer value);
 
   @Description("BQ Dataset")
+  ValueProvider<String> getDatasetId();
+
+  void setDatasetId(ValueProvider<String> datasetId);
+
+  @Description("BQ Dataset")
   String getDataset();
 
-  void setDataset(String value);
+  void setDataset(String dataset);
 
   @Description("BQ Write Method")
   @Default.Enum("DEFAULT")
@@ -204,4 +209,9 @@ public interface DLPTextToBigQueryStreamingV2PipelineOptions
   String getDLPParent();
 
   void setDLPParent(String parent);
+
+  @Description("projectId")
+  ValueProvider<String> getProjectId();
+
+  void setProjectId(ValueProvider<String> projectId);
 }

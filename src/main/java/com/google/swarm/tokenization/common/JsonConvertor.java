@@ -182,11 +182,6 @@ public final class JsonConvertor {
      */
     public static GenericRecord convertJsonToAvro(Schema schema, String avroJson) {
         try {
-            if(avroJson.contains("acook84@prlog.org"))
-            {
-                System.out.println("avroJson.."+avroJson);
-                System.out.println("schema.."+schema);
-            }
             return new GenericDatumReader<GenericRecord>(schema)
                     .read(null, DecoderFactory.get().jsonDecoder(schema, avroJson));
         } catch (Exception exception) {
