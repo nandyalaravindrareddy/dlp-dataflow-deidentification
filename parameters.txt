@@ -31,3 +31,31 @@ com.google.swarm.tokenization.DLPTextToBigQueryStreamingV2
 --DLPMethod=REID
 --keyRange=1024
 
+
+
+CREATE EXTERNAL TABLE employee_new (id int, name String,
+email string ,phone int,address string)
+ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.avro.AvroSerDe'
+STORED as INPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat'
+OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat';
+
+
+
+CREATE TABLE IF NOT EXISTS employee_new_txt ( id int not null, name string not null,
+email string not null,phone int,address string)
+COMMENT 'Employee details'
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+LINES TERMINATED BY '\n'
+STORED AS TEXTFILE;
+
+
+LOAD DATA LOCAL INPATH '/home/tejasweeparedla/emp.csv' OVERWRITE INTO TABLE employee_new_txt;
+
+100,ravi,ravi.514@gmail.com,111,hyderabad
+200,swetha,swetha.514@gmail.com,222,hyderabad
+300,krishna,krishna.514@gmail.com,null,america
+400,raj,raj.514@gmail.com,444,null
+500,shilpa,shilpa@gmail.com,null,null
+
+INSERT OVERWRITE TABLE employee_new SELECT * from employee_new_txt;
