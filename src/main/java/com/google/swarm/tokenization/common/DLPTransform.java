@@ -390,7 +390,12 @@ public abstract class DLPTransform
     private final Value value;
 
     ValueProcessor(Map.Entry<String, Value> entry) {
-      this.rawKey = entry.getKey();
+        String key = entry.getKey();
+        if(entry.getValue().equals(Value.getDefaultInstance())){
+            this.rawKey = key.contains(".")?key.split("\\.")[0]:key;
+        }else{
+            this.rawKey = entry.getKey();
+        }
       this.value = entry.getValue();
     }
 

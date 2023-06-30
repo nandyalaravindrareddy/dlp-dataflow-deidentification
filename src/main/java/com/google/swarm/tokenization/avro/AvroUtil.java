@@ -20,10 +20,15 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.util.*;
 import java.util.function.Consumer;
+
+import com.google.privacy.dlp.v2.Table;
+import com.google.privacy.dlp.v2.Value;
+import com.google.swarm.tokenization.common.ByteValueConverter;
 import org.apache.avro.LogicalType;
 import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
 import org.apache.avro.file.SeekableInput;
+import org.apache.avro.generic.GenericFixed;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.beam.sdk.io.FileIO;
 import org.joda.time.Duration;
@@ -31,6 +36,8 @@ import org.joda.time.Instant;
 import org.joda.time.format.DateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 /** Various helpers for working with Avro files. */
 public class AvroUtil {
@@ -88,7 +95,7 @@ public class AvroUtil {
    * the given consumer. Uses a stack to perform an iterative, preorder traversal of the schema
    * tree.
    */
-  public static void getFlattenedValues(GenericRecord rootNode, Consumer<Object> consumer) {
+  public static void getFlattenedValues(Table.Row.Builder rowBuilder,GenericRecord rootNode) {
     Deque<Object> stack = new ArrayDeque<>();
     // Start with the given record
     stack.push(rootNode);
@@ -98,34 +105,85 @@ public class AvroUtil {
         // The current node is a record, so we go one level deeper...
         GenericRecord record = (GenericRecord) node;
         List<Schema.Field> fields = record.getSchema().getFields();
-        ListIterator<Schema.Field> iterator = fields.listIterator(fields.size());
+        ListIterator<Schema.Field> iterator = fields.listIterator();
         // Push all of the record's sub-fields to the stack in reverse order
         // to prioritize sub-fields from left to right in subsequent loop iterations.
-        while (iterator.hasPrevious()) {
-          String fieldName = iterator.previous().name();
+        while (iterator.hasNext()) {
+          Schema.Field field = iterator.next();
+          Schema schema = field.schema();
+          String fieldName = field.name();
           Object value = record.get(fieldName);
-          if (value == null) {
+
+          Schema.Type type = schema.getType();
+          LogicalType logicalType = schema.getLogicalType();
+          if(schema.getType().getName().equalsIgnoreCase("union")){
+            type = schema.getTypes().get(1).getType();
+          }
+          if(value==null){
+            rowBuilder.addValues(Value.getDefaultInstance()).build();
+          }else {
+            constructRowBuilder(rowBuilder, value, type);
+          }
+
+          /*if (value == null) {
             // Special case: A stack can't accept a null value,
             // so we substitute for a mock object instead.
-            stack.push(new NullValue());
+            //stack.push(new NullValue());
+            rowBuilder.addValues(Value.newBuilder().setStringValue(new NullValue).build());
           } else {
-            LogicalType logicalType =
-                record.getSchema().getField(fieldName).schema().getLogicalType();
             Object convertedValue = AvroUtil.convertForDLP(value, logicalType);
-            stack.push(convertedValue);
-          }
-        }
-      } else {
-        // The current node is a simple value.
-        if (node instanceof NullValue) {
-          // Substitute the mock NullValue object for an actual `null` value.
-          consumer.accept(null);
-        } else {
-          consumer.accept(node);
+
+            rowBuilder.addValues(Value.newBuilder().setStringValue("").build());
+          }*/
+
+
         }
       }
     }
   }
+
+  public static void constructRowBuilder(Table.Row.Builder rowBuilder,Object value,Schema.Type type){
+    switch (type) {
+      case STRING:
+          rowBuilder.addValues(Value.newBuilder().setStringValue(value.toString()).build());
+        break;
+
+      case BOOLEAN:
+          rowBuilder.addValues(Value.newBuilder().setBooleanValue((boolean) value).build());
+        break;
+
+      case FLOAT:
+          rowBuilder.addValues(Value.newBuilder().setFloatValue((float) value).build());
+        break;
+
+      case DOUBLE:
+          rowBuilder.addValues(Value.newBuilder().setFloatValue((double) value).build());
+        break;
+
+      case INT:
+          rowBuilder.addValues(Value.newBuilder().setIntegerValue((int) value).build());
+        break;
+
+      case LONG:
+          rowBuilder.addValues(Value.newBuilder().setIntegerValue((long) value).build());
+        break;
+
+      case FIXED:
+        rowBuilder.addValues(ByteValueConverter.convertBytesToValue(((GenericFixed) value).bytes()));
+        break;
+
+      case BYTES:
+        rowBuilder.addValues(ByteValueConverter.convertBytesToValue(((ByteBuffer) value).array()));
+        break;
+
+      case NULL:
+        break;
+
+      case MAP:
+        throw new IllegalArgumentException(String.format("Unsupported Type MAP "));
+    }
+  }
+
 
   /** Byte channel that enables random access for Avro files. */
   public static class AvroSeekableByteChannel implements SeekableInput {

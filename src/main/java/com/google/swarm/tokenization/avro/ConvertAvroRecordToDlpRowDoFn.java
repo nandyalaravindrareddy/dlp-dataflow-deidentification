@@ -29,15 +29,8 @@ public class ConvertAvroRecordToDlpRowDoFn
     String key = c.element().getKey();
     GenericRecord record = c.element().getValue();
     Table.Row.Builder rowBuilder = Table.Row.newBuilder();
-    AvroUtil.getFlattenedValues(
-        record,
-        (Object value) -> {
-          if (value == null) {
-            rowBuilder.addValues(Value.newBuilder().setStringValue("").build());
-          } else {
-            rowBuilder.addValues(Value.newBuilder().setStringValue(value.toString()).build());
-          }
-        });
+    AvroUtil.getFlattenedValues(rowBuilder,
+        record);
     c.output(KV.of(key, rowBuilder.build()));
   }
 }
