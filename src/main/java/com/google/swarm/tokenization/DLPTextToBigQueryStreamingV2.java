@@ -28,36 +28,29 @@ import com.google.swarm.tokenization.json.JsonReaderSplitDoFn;
 import com.google.swarm.tokenization.txt.ConvertTxtToDLPRow;
 import com.google.swarm.tokenization.txt.ParseTextLogDoFn;
 import com.google.swarm.tokenization.txt.TxtReaderSplitDoFn;
-import java.util.List;
-import java.util.Map;
-
 import org.apache.avro.Schema;
 import org.apache.avro.file.CodecFactory;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.beam.repackaged.core.org.apache.commons.compress.utils.FileNameUtils;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.coders.KvCoder;
 import org.apache.beam.sdk.coders.StringUtf8Coder;
 import org.apache.beam.sdk.extensions.avro.coders.AvroCoder;
+import org.apache.beam.sdk.extensions.gcp.util.gcsfs.GcsPath;
 import org.apache.beam.sdk.io.AvroIO;
 import org.apache.beam.sdk.io.FileIO;
 import org.apache.beam.sdk.io.FileIO.ReadableFile;
-import org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO;
-import org.apache.beam.sdk.io.gcp.bigquery.InsertRetryPolicy;
 import org.apache.beam.sdk.io.gcp.pubsub.PubsubIO;
 import org.apache.beam.sdk.options.PipelineOptionsFactory;
 import org.apache.beam.sdk.transforms.*;
-import org.apache.beam.sdk.transforms.windowing.FixedWindows;
-import org.apache.beam.sdk.transforms.windowing.Window;
-import org.apache.beam.sdk.values.KV;
-import org.apache.beam.sdk.values.PCollection;
-import org.apache.beam.sdk.values.PCollectionList;
-import org.apache.beam.sdk.values.PCollectionTuple;
-import org.apache.beam.sdk.values.PCollectionView;
-import org.apache.beam.sdk.values.TupleTagList;
+import org.apache.beam.sdk.values.*;
 import org.joda.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.List;
+import java.util.Map;
 
 public class DLPTextToBigQueryStreamingV2 {
 
@@ -236,10 +229,8 @@ public class DLPTextToBigQueryStreamingV2 {
     deidGenericRecords.apply(
             "WriteAVRO",
             AvroIO.writeGenericRecords(schema)
-                    .to(options.getOutputAvroBucket())
+                    .to(options.getOutputAvroBucket()+FileNameUtils.getBaseName(GcsPath.fromUri(options.getFilePattern()).getObject()))
                     .withCodec(CodecFactory.snappyCodec())
-                    .withSuffix("_ravi_op.avro")
-                    .withWindowedWrites()
                     .withNumShards(1));
 
 
