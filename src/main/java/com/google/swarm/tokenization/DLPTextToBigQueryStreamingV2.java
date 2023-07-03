@@ -16,6 +16,10 @@
 package com.google.swarm.tokenization;
 
 import com.google.api.services.bigquery.model.TableRow;
+import com.google.cloud.bigquery.BigQuery;
+import com.google.cloud.bigquery.BigQueryOptions;
+import com.google.cloud.bigquery.QueryJobConfiguration;
+import com.google.cloud.bigquery.TableResult;
 import com.google.privacy.dlp.v2.DeidentifyConfig;
 import com.google.privacy.dlp.v2.Table;
 import com.google.swarm.tokenization.avro.AvroReaderSplittableDoFn;
@@ -45,6 +49,7 @@ import org.apache.beam.sdk.io.gcp.pubsub.PubsubIO;
 import org.apache.beam.sdk.options.PipelineOptionsFactory;
 import org.apache.beam.sdk.transforms.*;
 import org.apache.beam.sdk.values.*;
+import org.apache.commons.lang3.StringUtils;
 import org.joda.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,7 +81,14 @@ public class DLPTextToBigQueryStreamingV2 {
     switch (options.getDLPMethod()) {
       case INSPECT:
       case DEID:
-        runInspectAndDeidPipeline(p, options);
+        String fileName = StringUtils.EMPTY;
+        try {
+          fileName = FileNameUtils.getBaseName(GcsPath.fromUri(options.getFilePattern()).getObject());
+          runInspectAndDeidPipeline(p, options,fileName);
+        }catch(Exception e){
+          LOG.error("DLP De-Identification process is failed : due to "+e.getMessage());
+          BigQueryOps.updateRecord(options.getDataset(),options.getTableRef(),"Failed",fileName);
+        }
         break;
 
       case REID:
@@ -91,7 +103,9 @@ public class DLPTextToBigQueryStreamingV2 {
   }
 
   private static void runInspectAndDeidPipeline(
-      Pipeline p, DLPTextToBigQueryStreamingV2PipelineOptions options) {
+      Pipeline p, DLPTextToBigQueryStreamingV2PipelineOptions options,String fileName) {
+    LOG.info("DLP de-identification process is started for file {}",fileName);
+    BigQueryOps.updateRecord(options.getDataset(),options.getTableRef(),"InProgress",fileName);
     DeidentifyConfig deidentifyConfig = JsonConvertor.parseJson(ReadGcsObject.getGcsObjectContent(options.getDeidConfig()), DeidentifyConfig.class);
     Schema schema = new Schema.Parser().parse(ReadGcsObject.getGcsObjectContent(options.getDeidSchema()));
     PCollection<KV<String, ReadableFile>> inputFiles = p.apply(FileIO.match().filepattern(options.getFilePattern()))
@@ -193,16 +207,6 @@ public class DLPTextToBigQueryStreamingV2 {
         throw new IllegalArgumentException("Please validate FileType parameter");
     }
 
-    /*String schemaString = "{\n" +
-            "  \"namespace\": \"RaviAvroIoDemo\",\n" +
-            "  \"name\": \"user\",\n" +
-            "  \"type\": \"record\",\n" +
-            "  \"fields\": [\n" +
-            "    {\"name\": \"id\", \"type\": \"string\"},\n" +
-            "    {\"name\": \"name\", \"type\": \"string\"},\n" +
-            "    {\"name\": \"email\", \"type\": \"string\"}\n" +
-            "  ]\n" +
-            "}";*/
     //Schema schema = new Schema.Parser().parse(schemaString);
     PCollectionTuple pCollectionTuple = records
         .apply(
@@ -229,7 +233,7 @@ public class DLPTextToBigQueryStreamingV2 {
     deidGenericRecords.apply(
             "WriteAVRO",
             AvroIO.writeGenericRecords(schema)
-                    .to(options.getOutputAvroBucket()+FileNameUtils.getBaseName(GcsPath.fromUri(options.getFilePattern()).getObject()))
+                    .to(options.getOutputAvroBucket()+fileName)
                     .withCodec(CodecFactory.snappyCodec())
                     .withNumShards(1));
 

@@ -24,18 +24,6 @@ import com.google.swarm.tokenization.beam.DLPDeidentifyText;
 import com.google.swarm.tokenization.beam.DLPInspectText;
 import com.google.swarm.tokenization.beam.DLPReidentifyText;
 import com.google.swarm.tokenization.common.Util.DLPMethod;
-
-import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-import javax.annotation.Nullable;
-
-import com.google.swarm.tokenization.ravisamples.TestDlp;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.beam.sdk.io.gcp.bigquery.BigQueryHelpers;
@@ -44,14 +32,19 @@ import org.apache.beam.sdk.metrics.Metrics;
 import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.PTransform;
 import org.apache.beam.sdk.transforms.ParDo;
-import org.apache.beam.sdk.values.KV;
-import org.apache.beam.sdk.values.PCollection;
-import org.apache.beam.sdk.values.PCollectionTuple;
-import org.apache.beam.sdk.values.PCollectionView;
-import org.apache.beam.sdk.values.Row;
-import org.apache.beam.sdk.values.TupleTagList;
+import org.apache.beam.sdk.values.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nullable;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static com.google.swarm.tokenization.common.JsonConvertor.convertJsonToAvro;
 
@@ -260,10 +253,7 @@ public abstract class DLPTransform
       LOG.info("Table de-identified returned with {} rows", tokenizedData.getRowsCount());
       numberOfRowDeidentified.inc(tokenizedData.getRowsCount());
       List<String> headers = headerColumnMap.get(fileName);
-      /*List<String> headers =
-          tokenizedData.getHeadersList().stream()
-              .map(fid -> fid.getName())
-              .collect(Collectors.toList());*/
+
       List<Table.Row> outputRows = tokenizedData.getRowsList();
       if (outputRows.size() > 0) {
         for (Table.Row outputRow : outputRows) {
