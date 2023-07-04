@@ -48,22 +48,27 @@ public class AvroUtil {
    * Returns the list of field names from the given schema. Calls itself recursively to flatten
    * nested fields.
    */
-  public static void flattenFieldNames(Schema schema, List<String> fieldNames, String prefix) {
+  public static void flattenFieldNames(Schema schema, List<String> fieldNames,List<String> deIdentifiedFields, String prefix) {
     for (Schema.Field field : schema.getFields()) {
       if (field.schema().getType() == Schema.Type.RECORD) {
-        flattenFieldNamesForAvroFile(field.schema(), fieldNames, prefix + field.name() + ".");
+        flattenFieldNamesForAvroFile(field.schema(), fieldNames, deIdentifiedFields,prefix + field.name() + ".");
       } else {
         fieldNames.add(prefix + field.name());
       }
     }
   }
 
-  public static void flattenFieldNamesForAvroFile(Schema schema, List<String> fieldNames, String prefix) {
+  public static void flattenFieldNamesForAvroFile(Schema schema, List<String> fieldNames,List<String> deIdentifiedFields, String prefix) {
     for (Schema.Field field : schema.getFields()) {
       if (field.schema().getType() == Schema.Type.RECORD) {
-        flattenFieldNamesForAvroFile(field.schema(), fieldNames, prefix + field.name() + ".");
+        flattenFieldNamesForAvroFile(field.schema(), fieldNames, deIdentifiedFields,prefix + field.name() + ".");
       } else if(field.schema().getType() == Schema.Type.UNION) {
-        fieldNames.add(field.name()+"."+field.schema().getTypes().get(1).getType().getName());
+        if(deIdentifiedFields.contains(field.name())){
+          fieldNames.add(field.name()+".string");
+        }else{
+          fieldNames.add(field.name()+"."+field.schema().getTypes().get(1).getType().getName());
+        }
+
       }else{
         fieldNames.add(prefix + field.name());
       }
@@ -95,7 +100,7 @@ public class AvroUtil {
    * the given consumer. Uses a stack to perform an iterative, preorder traversal of the schema
    * tree.
    */
-  public static void getFlattenedValues(Table.Row.Builder rowBuilder,GenericRecord rootNode) {
+  public static void getFlattenedValues(Table.Row.Builder rowBuilder,GenericRecord rootNode,List<String> deIdentifiedFields) {
     Deque<Object> stack = new ArrayDeque<>();
     // Start with the given record
     stack.push(rootNode);
@@ -122,6 +127,8 @@ public class AvroUtil {
           if(value==null){
             rowBuilder.addValues(Value.getDefaultInstance()).build();
           }else {
+            if(deIdentifiedFields.contains(fieldName))
+              type = Schema.Type.STRING;
             constructRowBuilder(rowBuilder, value, type);
           }
 

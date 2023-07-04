@@ -21,6 +21,8 @@ import com.google.cloud.bigquery.BigQueryOptions;
 import com.google.cloud.bigquery.QueryJobConfiguration;
 import com.google.cloud.bigquery.TableResult;
 import com.google.privacy.dlp.v2.DeidentifyConfig;
+import com.google.privacy.dlp.v2.FieldId;
+import com.google.privacy.dlp.v2.FieldTransformation;
 import com.google.privacy.dlp.v2.Table;
 import com.google.swarm.tokenization.avro.AvroReaderSplittableDoFn;
 import com.google.swarm.tokenization.avro.ConvertAvroRecordToDlpRowDoFn;
@@ -54,8 +56,11 @@ import org.joda.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 public class DLPTextToBigQueryStreamingV2 {
 
@@ -105,8 +110,15 @@ public class DLPTextToBigQueryStreamingV2 {
   private static void runInspectAndDeidPipeline(
       Pipeline p, DLPTextToBigQueryStreamingV2PipelineOptions options,String fileName) {
     LOG.info("DLP de-identification process is started for file {}",fileName);
-    BigQueryOps.updateRecord(options.getDataset(),options.getTableRef(),"InProgress",fileName);
+    //BigQueryOps.updateRecord(options.getDataset(),options.getTableRef(),"InProgress",fileName);
     DeidentifyConfig deidentifyConfig = JsonConvertor.parseJson(ReadGcsObject.getGcsObjectContent(options.getDeidConfig()), DeidentifyConfig.class);
+    List<String> deIdentifiedFields = new ArrayList<String>();
+    List<FieldTransformation> fields = deidentifyConfig.getRecordTransformations().getFieldTransformationsList();
+    for(FieldTransformation fieldTransformation : fields){
+      for(FieldId fieldId : fieldTransformation.getFieldsList()){
+          deIdentifiedFields.add(fieldId.getName());
+      }
+    }
     Schema schema = new Schema.Parser().parse(ReadGcsObject.getGcsObjectContent(options.getDeidSchema()));
     PCollection<KV<String, ReadableFile>> inputFiles = p.apply(FileIO.match().filepattern(options.getFilePattern()))
             .apply(FileIO.readMatches())
@@ -134,6 +146,7 @@ public class DLPTextToBigQueryStreamingV2 {
                 .setFileType(options.getFileType())
                 .setHeaders(options.getHeaders())
                 .setColumnDelimiter(options.getColumnDelimiter())
+                    .setDeIdentifiedFields(deIdentifiedFields)
                 .build());
 
 
@@ -148,7 +161,7 @@ public class DLPTextToBigQueryStreamingV2 {
                         new AvroReaderSplittableDoFn(
                             options.getKeyRange(), options.getSplitSize())))
                 .setCoder(KvCoder.of(StringUtf8Coder.of(), GenericRecordCoder.of()))
-                .apply(ParDo.of(new ConvertAvroRecordToDlpRowDoFn()));
+                .apply(ParDo.of(new ConvertAvroRecordToDlpRowDoFn(deIdentifiedFields)));
         break;
       case TSV:
         options.setColumnDelimiter('\t');

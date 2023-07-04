@@ -44,6 +44,8 @@ public abstract class ExtractColumnNamesTransform
 
   public abstract Character columnDelimiter();
 
+  public abstract List<String> deIdentifiedFields();
+
   @AutoValue.Builder
   public abstract static class Builder {
 
@@ -54,6 +56,7 @@ public abstract class ExtractColumnNamesTransform
     public abstract ExtractColumnNamesTransform.Builder setColumnDelimiter(
         Character columnDelimiter);
 
+    public abstract ExtractColumnNamesTransform.Builder setDeIdentifiedFields(List<String> deIdentifiedFields);
     public abstract ExtractColumnNamesTransform build();
   }
 
@@ -75,7 +78,7 @@ public abstract class ExtractColumnNamesTransform
         break;
 
       case AVRO:
-        readHeader = input.apply("ReadHeader", ParDo.of(new AvroColumnNamesDoFn()));
+        readHeader = input.apply("ReadHeader", ParDo.of(new AvroColumnNamesDoFn(deIdentifiedFields())));
         break;
 
       case JSONL:

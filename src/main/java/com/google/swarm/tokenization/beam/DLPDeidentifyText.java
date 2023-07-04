@@ -335,7 +335,7 @@ public abstract class DLPDeidentifyText
         }
         dlpTableHeaders =
             columns.stream()
-                .map(header -> FieldId.newBuilder().setName(header).build())
+                .map(header -> FieldId.newBuilder().setName(header.contains(".")?header.split("\\.")[0]:header).build())
                 .collect(Collectors.toList());
       } else {
         // handle unstructured input

@@ -21,16 +21,22 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.values.KV;
 
+import java.util.List;
+
 public class ConvertAvroRecordToDlpRowDoFn
     extends DoFn<KV<String, GenericRecord>, KV<String, Table.Row>> {
 
+  List<String> deIdentifiedFields;
+  public ConvertAvroRecordToDlpRowDoFn(List<String> deIdentifiedFields){
+    this.deIdentifiedFields = deIdentifiedFields;
+  }
   @ProcessElement
   public void processElement(ProcessContext c) {
     String key = c.element().getKey();
     GenericRecord record = c.element().getValue();
     Table.Row.Builder rowBuilder = Table.Row.newBuilder();
     AvroUtil.getFlattenedValues(rowBuilder,
-        record);
+        record,deIdentifiedFields);
     c.output(KV.of(key, rowBuilder.build()));
   }
 }

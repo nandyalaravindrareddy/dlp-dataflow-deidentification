@@ -33,6 +33,12 @@ public class AvroColumnNamesDoFn extends DoFn<KV<String, ReadableFile>, KV<Strin
 
   public static final Logger LOG = LoggerFactory.getLogger(AvroColumnNamesDoFn.class);
 
+  private List<String> deIdentifiedFields;
+
+  public AvroColumnNamesDoFn(List<String> deIdentifiedFields) {
+    this.deIdentifiedFields = deIdentifiedFields;
+  }
+
   @ProcessElement
   public void processElement(ProcessContext c) {
     ReadableFile avroFile = c.element().getValue();
@@ -40,7 +46,7 @@ public class AvroColumnNamesDoFn extends DoFn<KV<String, ReadableFile>, KV<Strin
       DatumReader<GenericRecord> reader = new GenericDatumReader<>();
       DataFileReader<GenericRecord> fileReader = new DataFileReader<>(channel, reader);
       List<String> fieldNames = new ArrayList<>();
-      AvroUtil.flattenFieldNamesForAvroFile(fileReader.getSchema(), fieldNames, "");
+      AvroUtil.flattenFieldNamesForAvroFile(fileReader.getSchema(), fieldNames, deIdentifiedFields,"");
 
       String fileName = c.element().getKey();
       c.output(KV.of(fileName, fieldNames));

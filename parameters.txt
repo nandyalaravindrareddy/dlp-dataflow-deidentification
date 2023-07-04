@@ -7,15 +7,33 @@ com.google.swarm.tokenization.DLPTextToBigQueryStreamingV2
 --numWorkers=1
 --maxNumWorkers=2
 --runner=DirectRunner
---filePattern=gs://avid-booth-387215-bucket/ravi/inputfiles/*.avro
---dataset=ravidataset
---datasetId=ravidataset
---deidConfig=gs://avid-booth-387215-bucket/ravi/inputfiles/deid_config_ravi.json
+--filePattern=gs://avid-booth-387215-bucket/ravi/inputfiles/employee.avro
+--dataset=ravi_dataset
+--datasetId=ravi_dataset
+--deidConfig=gs://avid-booth-387215-bucket/ravi/inputfiles/emp_config_ravi_conditions.json
 --deidSchema=gs://avid-booth-387215-bucket/ravi/inputfiles/deid_schema_ravi.json
 --DLPMethod=DEID
+--tableRef=file_registration
 --outputAvroBucket=gs://avid-booth-387215-bucket/ravi/outputfiles/
 
+===============================================emp_new================
+--region=us-central1
+--project=avid-booth-387215
+--projectId=avid-booth-387215
+--tempLocation=gs://avid-booth-387215-bucket/temp
+--numWorkers=1
+--maxNumWorkers=2
+--runner=DirectRunner
+--filePattern=gs://avid-booth-387215-bucket/ravi/inputfiles/employee_new_3-06-2023.8.30a.m.avro
+--dataset=ravi_dataset
+--datasetId=ravi_dataset
+--deidConfig=gs://avid-booth-387215-bucket/ravi/inputfiles/emp_new_config_ravi_conditions.json
+--deidSchema=gs://avid-booth-387215-bucket/ravi/inputfiles/employee_new_schema_converted.json
+--DLPMethod=DEID
+--tableRef=file_registration
+--outputAvroBucket=gs://avid-booth-387215-bucket/ravi/outputfiles/
 
+=================reid=============
 com.google.swarm.tokenization.DLPTextToBigQueryStreamingV2
 --region=us-central1
 --project=avid-booth-387215
