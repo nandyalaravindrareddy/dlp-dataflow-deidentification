@@ -92,7 +92,7 @@ public class DLPTextToBigQueryStreamingV2 {
           runInspectAndDeidPipeline(p, options,fileName);
         }catch(Exception e){
           LOG.error("DLP De-Identification process is failed : due to "+e.getMessage());
-          BigQueryOps.updateRecord(options.getDataset(),options.getTableRef(),"Failed",fileName);
+          //BigQueryOps.updateRecord(options.getDataset(),options.getTableRef(),"Failed",fileName);
         }
         break;
 

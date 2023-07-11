@@ -232,7 +232,13 @@ public abstract class DLPTransform
   static class ConvertDeidResponse
       extends DoFn<KV<String, DeidentifyContentResponse>, KV<String, TableRow>> {
 
+    @Setup
+    public void setup() {
+      schemaObject =  new Schema.Parser().parse(ReadGcsObject.getGcsObjectContent(schema));
+    }
     private String schema;
+
+    private Schema schemaObject;
 
     private PCollectionView<Map<String, List<String>>> headerCoumnsView;
 
@@ -261,7 +267,6 @@ public abstract class DLPTransform
             throw new IllegalArgumentException(
                 "CSV file's header count must exactly match with data element count");
           }
-          Schema schemaObject =  new Schema.Parser().parse(ReadGcsObject.getGcsObjectContent(schema));
           GenericRecord genericRecord = generateGenericRecord(outputRow,headers,schemaObject);
           out.get(Util.deidGenericRecords).output(genericRecord);
           out.get(Util.inspectOrDeidSuccess)
@@ -363,10 +368,12 @@ public abstract class DLPTransform
             .forEach(index -> flatRecords.put(headers.get(index), tableRow.getValues(index)));
 
     for (Map.Entry<String, Value> entry : flatRecords.entrySet()) {
-      ValueProcessor valueProcessor = new ValueProcessor(entry);
+      ValueProcessor valueProcessor = new ValueProcessor(entry,schema);
       jsonValueMap.put(valueProcessor.cleanKey(), valueProcessor.convertedValue());
     }
     String unattendedRecordJson = new JsonUnflattener(jsonValueMap).unflatten();
+    System.out.println("unattendedRecordJson:"+unattendedRecordJson);
+    System.out.println("schema:"+schema);
     return convertJsonToAvro(schema, unattendedRecordJson);
   }
 
@@ -379,7 +386,9 @@ public abstract class DLPTransform
     private final String rawKey;
     private final Value value;
 
-    ValueProcessor(Map.Entry<String, Value> entry) {
+    private final Schema schema;
+    ValueProcessor(Map.Entry<String, Value> entry,Schema schema) {
+      this.schema=schema;
         String key = entry.getKey();
         if(entry.getValue().equals(Value.getDefaultInstance())){
             this.rawKey = key.contains(".")?key.split("\\.")[0]:key;
@@ -410,7 +419,8 @@ public abstract class DLPTransform
           return null;
         default:
         case STRING_VALUE:
-          if (keyType != null && keyType.equals("bytes")) {
+          Schema.Field field = schema.getField(rawKey);
+          if (field!=null && field.schema().getType().getName().equals("bytes") || rawKey.contains("bytes")) {
             return ByteValueConverter.of(value).asJsonString();
           }
           return value.getStringValue();
