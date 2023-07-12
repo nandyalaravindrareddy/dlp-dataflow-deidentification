@@ -64,11 +64,17 @@ public interface DLPTextToBigQueryStreamingV2PipelineOptions
 
   void setDLPMethod(DLPMethod value);
 
-  @Description("Batch Size (max 524kb)")
+  @Description("Batch Size (max 500kb)")
   @Default.Integer(500000)
   Integer getBatchSize();
 
   void setBatchSize(Integer value);
+
+  @Description("Batch Size (max 50k)")
+  @Default.Integer(50000)
+  Integer getMaxDlpTableCells();
+
+  void setMaxDlpTableCells(Integer value);
 
   @Description("key range")
   @Default.Integer(100)

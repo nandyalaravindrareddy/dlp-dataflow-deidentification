@@ -119,6 +119,12 @@ public abstract class DLPDeidentifyText
   public abstract Integer getBatchSizeBytes();
 
   /**
+   * @return Size of DlpTableCells per batch to be sent to Cloud DLP service in one request.
+   */
+  public abstract Integer getMaxDlpTableCells();
+
+
+  /**
    * @return ID of Google Cloud project to be used when deidentifying data.
    */
   public abstract String getProjectId();
@@ -150,6 +156,11 @@ public abstract class DLPDeidentifyText
      * @param batchSize Size of input elements batch to be sent to Cloud DLP service in one request.
      */
     public abstract DLPDeidentifyText.Builder setBatchSizeBytes(Integer batchSize);
+
+    /**
+     * @param maxDlpTableCells Size of table cells for a given batch to be sent to Cloud DLP service in one request.
+     */
+    public abstract DLPDeidentifyText.Builder setMaxDlpTableCells(Integer maxDlpTableCells);
 
     /**
      * @param projectId ID of Google Cloud project to be used when deidentifying data.
@@ -225,7 +236,7 @@ public abstract class DLPDeidentifyText
     LOG.info("ravi...in DeidentifyText");
     return input
         .apply("Shard Contents", new ShardRows())
-        .apply("Batch Contents", ParDo.of(new BatchRequestForDLP(getBatchSizeBytes())))
+        .apply("Batch Contents", ParDo.of(new BatchRequestForDLP(getBatchSizeBytes(),getMaxDlpTableCells(),getHeaderColumns())).withSideInputs(getHeaderColumns()))
         .apply("Unshard Contents", ParDo.of(new UnshardRows()))
         .apply(
             "DLPDeidentify",
@@ -358,6 +369,7 @@ public abstract class DLPDeidentifyText
           DeidentifyContentResponse response =
               dlpServiceClient.deidentifyContent(this.requestBuilder.build());
           c.output(KV.of(fileName, response));
+          LOG.info("ravi... response::"+response);
           break;
         } catch (ResourceExhaustedException e) {
           e.printStackTrace();

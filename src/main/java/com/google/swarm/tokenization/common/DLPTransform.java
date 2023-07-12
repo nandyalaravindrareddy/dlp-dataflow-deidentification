@@ -69,6 +69,8 @@ public abstract class DLPTransform
 
   public abstract Integer batchSize();
 
+  public abstract Integer maxDlpTableCells();
+
   public abstract String projectId();
 
   public abstract Character columnDelimiter();
@@ -97,6 +99,8 @@ public abstract class DLPTransform
     public abstract Builder setDeidTemplateName(String inspectTemplateName);
 
     public abstract Builder setBatchSize(Integer batchSize);
+
+    public abstract Builder setMaxDlpTableCells(Integer maxDlpTableCells);
 
     public abstract Builder setProjectId(String projectId);
 
@@ -151,6 +155,7 @@ public abstract class DLPTransform
                   DLPDeidentifyText.newBuilder()
                           .setDeidentifyConfig(deidConfig())
                       .setBatchSizeBytes(batchSize())
+                      .setMaxDlpTableCells(maxDlpTableCells())
                       .setColumnDelimiter(columnDelimiter())
                       .setHeaderColumns(headers())
                       .setInspectTemplateName(inspectTemplateName())
@@ -173,6 +178,7 @@ public abstract class DLPTransform
                   DLPReidentifyText.newBuilder()
                           .setReidentifyConfig(reidConfig())
                       .setBatchSizeBytes(batchSize())
+                      .setMaxDlpTableCells(maxDlpTableCells())
                       .setColumnDelimiter(columnDelimiter())
                       .setHeaderColumns(headers())
                       .setInspectTemplateName(inspectTemplateName())

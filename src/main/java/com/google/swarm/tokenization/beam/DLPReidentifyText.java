@@ -117,6 +117,11 @@ public abstract class DLPReidentifyText
   public abstract Integer getBatchSizeBytes();
 
   /**
+   * @return Size of DlpTableCells per batch to be sent to Cloud DLP service in one request.
+   */
+  public abstract Integer getMaxDlpTableCells();
+
+  /**
    * @return ID of Google Cloud project to be used when deidentifying data.
    */
   public abstract String getProjectId();
@@ -149,13 +154,17 @@ public abstract class DLPReidentifyText
     /**
      * @param reidentifyTemplateName Template name for data deidentification.
      */
-    public abstract DLPReidentifyText.Builder setReidentifyTemplateName(
-        String reidentifyTemplateName);
+    public abstract DLPReidentifyText.Builder setReidentifyTemplateName(String reidentifyTemplateName);
 
     /**
      * @param batchSize Size of input elements batch to be sent to Cloud DLP service in one request.
      */
     public abstract DLPReidentifyText.Builder setBatchSizeBytes(Integer batchSize);
+
+    /**
+     * @param maxDlpTableCells Size of table cells for a given batch to be sent to Cloud DLP service in one request.
+     */
+    public abstract DLPReidentifyText.Builder setMaxDlpTableCells(Integer maxDlpTableCells);
 
     /**
      * @param headerColumns List of column names if the input KV value is a delimited row in a map
@@ -223,7 +232,7 @@ public abstract class DLPReidentifyText
       PCollection<KV<String, Table.Row>> input) {
     return input
         .apply("Shard Contents", new ShardRows())
-        .apply("Batch Contents", ParDo.of(new BatchRequestForDLP(getBatchSizeBytes())))
+        .apply("Batch Contents", ParDo.of(new BatchRequestForDLP(getBatchSizeBytes(),getMaxDlpTableCells(),getHeaderColumns())))
         .apply("Unshard Contents", ParDo.of(new UnshardRows()))
         .apply(
             "DLPReidentify",
@@ -359,7 +368,7 @@ public abstract class DLPReidentifyText
 
           ReidentifyContentResponse response =
               dlpServiceClient.reidentifyContent(reidentifyContentRequest);
-
+          LOG.info("ravi... response::"+response);
           context.output(KV.of(tableRef, response));
         } catch (ResourceExhaustedException e) {
           Thread.sleep(10000);

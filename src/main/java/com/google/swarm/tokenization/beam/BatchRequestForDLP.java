@@ -18,12 +18,15 @@ package com.google.swarm.tokenization.beam;
 import com.google.privacy.dlp.v2.Table;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+
 import org.apache.beam.sdk.metrics.Counter;
 import org.apache.beam.sdk.metrics.Metrics;
 import org.apache.beam.sdk.state.*;
 import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
 import org.apache.beam.sdk.values.KV;
+import org.apache.beam.sdk.values.PCollectionView;
 import org.apache.beam.sdk.values.ShardedKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,6 +44,12 @@ public class BatchRequestForDLP
 
   private final Integer batchSizeBytes;
 
+  private final Integer maxDlpTableCells;
+
+  private Integer columnsCount;
+
+  private final PCollectionView<Map<String, List<String>>> headerColumns;
+
   @StateId("elementsBag")
   private final StateSpec<BagState<KV<ShardedKey<String>, Table.Row>>> elementsBag =
       StateSpecs.bag();
@@ -53,16 +62,23 @@ public class BatchRequestForDLP
    *
    * @param batchSize Desired batch size in bytes.
    */
-  public BatchRequestForDLP(Integer batchSize) {
+  public BatchRequestForDLP(Integer batchSize,Integer maxDlpTableCells,PCollectionView<Map<String, List<String>>> headerColumns) {
     this.batchSizeBytes = batchSize;
+    this.maxDlpTableCells = maxDlpTableCells;
+    this.headerColumns = headerColumns;
   }
 
   @ProcessElement
-  public void process(
+  public void process(ProcessContext context,
       @Element KV<ShardedKey<String>, Table.Row> element,
       @StateId("elementsBag") BagState<KV<ShardedKey<String>, Table.Row>> elementsBag,
       @TimerId("eventTimer") Timer eventTimer,
       BoundedWindow w) {
+    if (headerColumns != null) {
+      Map<String, List<String>> headerColumnMap = context.sideInput(headerColumns);
+      columnsCount = headerColumnMap.values().stream().findAny().get().size();
+    }
+    element = context.element();
     elementsBag.add(element);
     eventTimer.set(w.maxTimestamp());
   }
@@ -85,7 +101,8 @@ public class BatchRequestForDLP
       for (KV<ShardedKey<String>, Table.Row> element : elementsBag.read()) {
         int elementSize = element.getValue().getSerializedSize();
         boolean clearBuffer = bufferSize + elementSize > batchSizeBytes;
-        if (clearBuffer) {
+        boolean isMaxTableValuesReached = rows.size()*columnsCount > maxDlpTableCells;
+        if (clearBuffer || isMaxTableValuesReached) {
           LOG.debug("Clear buffer of {} bytes, Key {}", bufferSize, element.getKey());
           numberOfDLPRowsBagged.inc(rows.size());
           numberOfDLPRowBags.inc();

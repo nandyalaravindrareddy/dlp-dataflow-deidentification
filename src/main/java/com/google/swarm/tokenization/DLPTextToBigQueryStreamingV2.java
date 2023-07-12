@@ -229,6 +229,7 @@ public class DLPTextToBigQueryStreamingV2 {
                     .setDeidConfig(deidentifyConfig)
                     .setReidConfig(deidentifyConfig)
                 .setBatchSize(options.getBatchSize())
+                .setMaxDlpTableCells(options.getMaxDlpTableCells())
                 .setInspectTemplateName(options.getInspectTemplateName())
                 .setDeidTemplateName(options.getDeidentifyTemplateName())
                 .setDlpmethod(options.getDLPMethod())
@@ -277,7 +278,7 @@ public class DLPTextToBigQueryStreamingV2 {
                 .setReadMethod(options.getReadMethod())
                 .setKeyRange(options.getKeyRange())
                 //.setQuery(Util.getQueryFromGcs(options.getQueryPath()))
-                    .setQuery("SELECT id,name,email FROM `avid-booth-387215.ravidataset.ravi_inputfiles_employee` LIMIT 10")
+                    .setQuery("SELECT * FROM `avid-booth-387215.ravi_dataset.Test` LIMIT 10")
                 .build());
 
     PCollectionView<Map<String, List<String>>> selectedColumns =
@@ -295,6 +296,7 @@ public class DLPTextToBigQueryStreamingV2 {
                         .setReidConfig(reidConfig)
                         .setDeidConfig(reidConfig)
                     .setBatchSize(options.getBatchSize())
+                    .setMaxDlpTableCells(options.getMaxDlpTableCells())
                     .setInspectTemplateName(options.getInspectTemplateName())
                     .setDeidTemplateName(options.getDeidentifyTemplateName())
                     .setDlpmethod(options.getDLPMethod())

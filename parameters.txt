@@ -1,4 +1,22 @@
 env:GOOGLE_APPLICATION_CREDENTIALS=/home/india/saferoom/keys/avid-booth-387215-dc6aa8544fc3.json
+========11-july byte type conversion testing=========
+--region=us-central1
+--project=avid-booth-387215
+--projectId=avid-booth-387215
+--tempLocation=gs://avid-booth-387215-bucket/temp
+--numWorkers=1
+--maxNumWorkers=2
+--runner=DirectRunner
+--filePattern=gs://avid-booth-387215-bucket/ravi/inputfiles/emp_logicaltype_date_null.avro
+--dataset=ravi_dataset
+--datasetId=ravi_dataset
+--deidConfig=gs://avid-booth-387215-bucket/ravi/inputfiles/deid_employee_logical_type_date_byteinput.json
+--deidSchema=gs://avid-booth-387215-bucket/ravi/inputfiles/employee_logical_types_converted.json
+--DLPMethod=DEID
+--tableRef=file_registration
+--outputAvroBucket=gs://avid-booth-387215-bucket/ravi/outputfiles/
+
+=======================
 com.google.swarm.tokenization.DLPTextToBigQueryStreamingV2
 --region=us-central1
 --project=avid-booth-387215
@@ -33,7 +51,7 @@ com.google.swarm.tokenization.DLPTextToBigQueryStreamingV2
 --tableRef=file_registration
 --outputAvroBucket=gs://avid-booth-387215-bucket/ravi/outputfiles/
 
-=================reid=============
+=================reid working=============
 com.google.swarm.tokenization.DLPTextToBigQueryStreamingV2
 --region=us-central1
 --project=avid-booth-387215
@@ -46,6 +64,21 @@ com.google.swarm.tokenization.DLPTextToBigQueryStreamingV2
 --dataset=ravidataset
 --deidConfig=gs://avid-booth-387215-bucket/ravi/inputfiles/deid_config_ravi.json
 --deidSchema=gs://avid-booth-387215-bucket/ravi/inputfiles/deid_schema_ravi.json
+--DLPMethod=REID
+--keyRange=1024
+
+=================reid bytes type conversion testing=============
+--region=us-central1
+--project=avid-booth-387215
+--projectId=avid-booth-387215
+--tempLocation=gs://avid-booth-387215-bucket/temp
+--numWorkers=1
+--maxNumWorkers=2
+--runner=DirectRunner
+--tableRef=avid-booth-387215.ravi_dataset.Test
+--dataset=ravidataset
+--deidConfig=gs://avid-booth-387215-bucket/ravi/inputfiles/deid_employee_logical_type_date_byteinput.json
+--deidSchema=gs://avid-booth-387215-bucket/ravi/inputfiles/employee_logical_type_date.json
 --DLPMethod=REID
 --keyRange=1024
 

@@ -88,6 +88,8 @@ public abstract class DLPInspectText
    */
   public abstract Integer getBatchSizeBytes();
 
+  public abstract Integer getMaxDlpTableCells();
+
   /**
    * @return ID of Google Cloud project to be used when deidentifying data.
    */
@@ -127,6 +129,11 @@ public abstract class DLPInspectText
      * @param batchSize Size of input elements batch to be sent to Cloud DLP service in one request.
      */
     public abstract Builder setBatchSizeBytes(Integer batchSize);
+
+    /**
+     * @param maxDlpTableCells Size of table cells for a given batch to be sent to Cloud DLP service in one request.
+     */
+    public abstract Builder setMaxDlpTableCells(Integer maxDlpTableCells);
 
     /**
      * @param projectId ID of Google Cloud project to be used when deidentifying data.
@@ -190,7 +197,7 @@ public abstract class DLPInspectText
       PCollection<KV<String, Table.Row>> input) {
     return input
         .apply("Shard Contents", new ShardRows())
-        .apply("Batch Contents", ParDo.of(new BatchRequestForDLP(getBatchSizeBytes())))
+        .apply("Batch Contents", ParDo.of(new BatchRequestForDLP(getBatchSizeBytes(),getMaxDlpTableCells(),getHeaderColumns())))
         .apply("Unshard Contents", ParDo.of(new UnshardRows()))
         .apply(
             "DLPInspect",

@@ -127,7 +127,7 @@ public class AvroUtil {
           if(value==null){
             rowBuilder.addValues(Value.getDefaultInstance()).build();
           }else {
-            if(deIdentifiedFields.contains(fieldName))
+            if(deIdentifiedFields.contains(fieldName) && type!=Schema.Type.BYTES)
               type = Schema.Type.STRING;
             constructRowBuilder(rowBuilder, value, type);
           }
