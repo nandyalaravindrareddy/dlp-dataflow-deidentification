@@ -265,6 +265,7 @@ public class AvroUtil {
       rowBuilder.addValues(Value.newBuilder().setTimestampValue(timestamp).build());
     } else if (logicalType instanceof LogicalTypes.Decimal) {
       ByteBuffer byteBuffer = (ByteBuffer) fieldValue;
+      int precision = ((LogicalTypes.Decimal) logicalType).getPrecision();
       int scale = ((LogicalTypes.Decimal) logicalType).getScale();
       byte[] decimalBytes = byteBuffer.array();
       BigInteger unscaledValue = new BigInteger(decimalBytes);

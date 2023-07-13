@@ -25,6 +25,7 @@ import com.google.swarm.tokenization.beam.DLPDeidentifyText;
 import com.google.swarm.tokenization.beam.DLPInspectText;
 import com.google.swarm.tokenization.beam.DLPReidentifyText;
 import com.google.swarm.tokenization.common.Util.DLPMethod;
+import org.apache.avro.Conversions;
 import org.apache.avro.LogicalType;
 import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
@@ -415,52 +416,56 @@ public abstract class DLPTransform
      * @return Java Object equivalent for the Value Object.
      */
     Object convertedValue() {
-      String keyType = keyType();
-
-      if (value == null ) {
+      if (value == null || value.equals(Value.getDefaultInstance())) {
         return null;
       }
 
-      if (schema.getLogicalType() != null) {
-        LogicalType logicalType = schema.getLogicalType();
-        if (logicalType instanceof LogicalTypes.Date) {
-          String dateString = value.getStringValue();
-          LocalDate date = LocalDate.parse(dateString);
-          return (int) date.toEpochDay();
-        } else if (logicalType instanceof LogicalTypes.TimestampMillis) {
-          Timestamp timestamp = value.getTimestampValue();
-          java.time.Instant instant = java.time.Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos());
-          return instant.toEpochMilli();
-        } else if (logicalType instanceof LogicalTypes.Decimal) {
-          BigDecimal decimalValue = new BigDecimal(value.getStringValue());
-          int scale = ((LogicalTypes.Decimal) logicalType).getScale();
-          BigInteger unscaledValue = decimalValue.unscaledValue();
-          byte[] decimalBytes = unscaledValue.toByteArray();
-          ByteBuffer byteBuffer = ByteBuffer.wrap(decimalBytes);
-          return byteBuffer;
+      String keyType = keyType();
+      String fieldName = rawKey.contains(".") ? rawKey.split("\\.")[0] : rawKey;
+      Schema.Field field = schema.getField(fieldName);
+      Schema schema = field.schema();
+      Schema.Type type = schema.getType();
+      LogicalType logicalType = schema.getLogicalType();
+      if (schema.getType().getName().equalsIgnoreCase("union")) {
+        type = schema.getTypes().get(1).getType();
+        logicalType = schema.getTypes().get(1).getLogicalType();
+      }
+      System.out.println("fieldName::::"+fieldName);
+      if (logicalType != null) {
+          if (logicalType instanceof LogicalTypes.Date) {
+            String dateString = value.getStringValue();
+            LocalDate date = LocalDate.parse(dateString);
+            return (int) date.toEpochDay();
+          } else if (logicalType instanceof LogicalTypes.TimestampMillis) {
+            Timestamp timestamp = value.getTimestampValue();
+            java.time.Instant instant = java.time.Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos());
+            return instant.toEpochMilli();
+          } else if (logicalType instanceof LogicalTypes.Decimal) {
+            BigDecimal decimalValue = new BigDecimal(value.getStringValue());
+            int scale = ((LogicalTypes.Decimal) logicalType).getScale();
+            BigInteger scaledValue = decimalValue.setScale(scale).toBigInteger();
+            byte[] decimalBytes = scaledValue.toByteArray();
+            ByteBuffer byteBuffer = ByteBuffer.wrap(decimalBytes);
+            return byteBuffer;
+          }
+        } else {
+          switch (value.getTypeCase()) {
+            case INTEGER_VALUE:
+              return new BigInteger(String.valueOf(value.getIntegerValue()));
+            case FLOAT_VALUE:
+              return new BigDecimal(String.valueOf(value.getFloatValue()));
+
+            case BOOLEAN_VALUE:
+              return value.getBooleanValue();
+
+            case TYPE_NOT_SET:
+              return null;
+            default:
+            case STRING_VALUE:
+              return value.getStringValue();
+          }
         }
-        // Add conversions for other Avro logical types as needed
-      }
-
-      switch (value.getTypeCase()) {
-        case INTEGER_VALUE:
-          return new BigInteger(String.valueOf(value.getIntegerValue()));
-        case FLOAT_VALUE:
-          return new BigDecimal(String.valueOf(value.getFloatValue()));
-
-        case BOOLEAN_VALUE:
-          return value.getBooleanValue();
-
-        case TYPE_NOT_SET:
-          return null;
-        default:
-        case STRING_VALUE:
-          /*Schema.Field field = schema.getField(rawKey);
-          if (field!=null && field.schema().getType().getName().equals("bytes") || rawKey.contains("bytes")) {
-            return ByteValueConverter.of(value).asJsonString();
-          }*/
-          return value.getStringValue();
-      }
+      return null;
     }
 
     /** Returns the original type of a string value. */

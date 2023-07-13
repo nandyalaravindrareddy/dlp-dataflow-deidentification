@@ -20,6 +20,8 @@ import static com.google.swarm.tokenization.avro.AvroReaderSplittableDoFnTest.ge
 import static com.google.swarm.tokenization.avro.AvroReaderSplittableDoFnTest.schema;
 
 import com.google.privacy.dlp.v2.Table;
+
+import java.util.ArrayList;
 import java.util.List;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.beam.sdk.coders.AvroCoder;
@@ -44,13 +46,14 @@ public class ConvertAvroRecordToDlpRowDoFnTest {
     int numRecords = 10;
     List<GenericRecord> records = generateGenericRecords(numRecords);
     List<Table.Row> rows = generateDLPRows(numRecords);
-
+    //ravi to be modified
+    List<String> headerList = new ArrayList<>();
     PCollection<Table.Row> results =
         pipeline
             .apply(Create.of(records).withCoder(AvroCoder.of(schema)))
             .apply(WithKeys.of("some_key"))
             .setCoder(KvCoder.of(StringUtf8Coder.of(), AvroCoder.of(schema)))
-            .apply(ParDo.of(new ConvertAvroRecordToDlpRowDoFn()))
+            .apply(ParDo.of(new ConvertAvroRecordToDlpRowDoFn(headerList)))
             .apply(Values.create());
 
     PAssert.that(results).containsInAnyOrder(rows);
