@@ -101,8 +101,8 @@ public class BatchRequestForDLP
       for (KV<ShardedKey<String>, Table.Row> element : elementsBag.read()) {
         int elementSize = element.getValue().getSerializedSize();
         boolean clearBuffer = bufferSize + elementSize > batchSizeBytes;
-        boolean isMaxTableValuesReached = rows.size()*columnsCount > maxDlpTableCells;
-        if (clearBuffer || isMaxTableValuesReached) {
+        //boolean isMaxTableValuesReached = rows.size()*columnsCount > maxDlpTableCells;
+        if (clearBuffer) {
           LOG.debug("Clear buffer of {} bytes, Key {}", bufferSize, element.getKey());
           numberOfDLPRowsBagged.inc(rows.size());
           numberOfDLPRowBags.inc();

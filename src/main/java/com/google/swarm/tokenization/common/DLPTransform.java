@@ -20,10 +20,13 @@ import com.google.api.client.util.Maps;
 import com.google.api.services.bigquery.model.TableRow;
 import com.google.auto.value.AutoValue;
 import com.google.privacy.dlp.v2.*;
+import com.google.protobuf.Timestamp;
 import com.google.swarm.tokenization.beam.DLPDeidentifyText;
 import com.google.swarm.tokenization.beam.DLPInspectText;
 import com.google.swarm.tokenization.beam.DLPReidentifyText;
 import com.google.swarm.tokenization.common.Util.DLPMethod;
+import org.apache.avro.LogicalType;
+import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.beam.sdk.io.gcp.bigquery.BigQueryHelpers;
@@ -39,6 +42,8 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
+import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -412,6 +417,31 @@ public abstract class DLPTransform
     Object convertedValue() {
       String keyType = keyType();
 
+      if (value == null ) {
+        return null;
+      }
+
+      if (schema.getLogicalType() != null) {
+        LogicalType logicalType = schema.getLogicalType();
+        if (logicalType instanceof LogicalTypes.Date) {
+          String dateString = value.getStringValue();
+          LocalDate date = LocalDate.parse(dateString);
+          return (int) date.toEpochDay();
+        } else if (logicalType instanceof LogicalTypes.TimestampMillis) {
+          Timestamp timestamp = value.getTimestampValue();
+          java.time.Instant instant = java.time.Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos());
+          return instant.toEpochMilli();
+        } else if (logicalType instanceof LogicalTypes.Decimal) {
+          BigDecimal decimalValue = new BigDecimal(value.getStringValue());
+          int scale = ((LogicalTypes.Decimal) logicalType).getScale();
+          BigInteger unscaledValue = decimalValue.unscaledValue();
+          byte[] decimalBytes = unscaledValue.toByteArray();
+          ByteBuffer byteBuffer = ByteBuffer.wrap(decimalBytes);
+          return byteBuffer;
+        }
+        // Add conversions for other Avro logical types as needed
+      }
+
       switch (value.getTypeCase()) {
         case INTEGER_VALUE:
           return new BigInteger(String.valueOf(value.getIntegerValue()));
@@ -425,10 +455,10 @@ public abstract class DLPTransform
           return null;
         default:
         case STRING_VALUE:
-          Schema.Field field = schema.getField(rawKey);
+          /*Schema.Field field = schema.getField(rawKey);
           if (field!=null && field.schema().getType().getName().equals("bytes") || rawKey.contains("bytes")) {
             return ByteValueConverter.of(value).asJsonString();
-          }
+          }*/
           return value.getStringValue();
       }
     }

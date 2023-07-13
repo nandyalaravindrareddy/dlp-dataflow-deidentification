@@ -16,13 +16,18 @@
 package com.google.swarm.tokenization.avro;
 
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.math.RoundingMode;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.function.Consumer;
 
 import com.google.privacy.dlp.v2.Table;
 import com.google.privacy.dlp.v2.Value;
+import com.google.protobuf.Timestamp;
 import com.google.swarm.tokenization.common.ByteValueConverter;
 import org.apache.avro.LogicalType;
 import org.apache.avro.LogicalTypes;
@@ -30,6 +35,7 @@ import org.apache.avro.Schema;
 import org.apache.avro.file.SeekableInput;
 import org.apache.avro.generic.GenericFixed;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.beam.model.pipeline.v1.SchemaApi;
 import org.apache.beam.sdk.io.FileIO;
 import org.joda.time.Duration;
 import org.joda.time.Instant;
@@ -123,9 +129,12 @@ public class AvroUtil {
           LogicalType logicalType = schema.getLogicalType();
           if(schema.getType().getName().equalsIgnoreCase("union")){
             type = schema.getTypes().get(1).getType();
+            logicalType = schema.getTypes().get(1).getLogicalType();
           }
           if(value==null){
             rowBuilder.addValues(Value.getDefaultInstance()).build();
+          } else if (logicalType!=null){
+            convertAvroLogicalFieldValueToDLPValue(rowBuilder,value,logicalType);
           }else {
             if(deIdentifiedFields.contains(fieldName) && type!=Schema.Type.BYTES)
               type = Schema.Type.STRING;
@@ -239,4 +248,31 @@ public class AvroUtil {
     }
     return new AvroSeekableByteChannel(channel);
   }
+
+  public static void convertAvroLogicalFieldValueToDLPValue(Table.Row.Builder rowBuilder,Object fieldValue, LogicalType logicalType) {
+    if (logicalType instanceof LogicalTypes.Date) {
+      int daysSinceEpoch = (int) fieldValue;
+      LocalDate date = LocalDate.ofEpochDay(daysSinceEpoch);
+      String dateString = date.toString();
+      rowBuilder.addValues(Value.newBuilder().setStringValue(dateString).build());
+    } else if (logicalType instanceof LogicalTypes.TimestampMillis) {
+      long milliseconds = (long) fieldValue;
+      java.time.Instant instant = java.time.Instant.ofEpochMilli(milliseconds);
+      Timestamp timestamp = Timestamp.newBuilder()
+              .setSeconds(instant.getEpochSecond())
+              .setNanos(instant.getNano())
+              .build();
+      rowBuilder.addValues(Value.newBuilder().setTimestampValue(timestamp).build());
+    } else if (logicalType instanceof LogicalTypes.Decimal) {
+      ByteBuffer byteBuffer = (ByteBuffer) fieldValue;
+      int scale = ((LogicalTypes.Decimal) logicalType).getScale();
+      byte[] decimalBytes = byteBuffer.array();
+      BigInteger unscaledValue = new BigInteger(decimalBytes);
+      BigDecimal decimalValue = new BigDecimal(unscaledValue, scale);
+      rowBuilder.addValues(Value.newBuilder().setStringValue(decimalValue.toString()).build());
+    }
+  }
+
 }
+
+
